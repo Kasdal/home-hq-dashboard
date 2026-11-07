@@ -231,6 +231,19 @@ def local_photos():
 
 
 def main():
+    os.makedirs(DATA, exist_ok=True)
+    lock_path = os.path.join(DATA, ".photos.lock")
+    lock = open(lock_path, "w")
+    try:
+        import fcntl
+
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except ImportError:
+        pass
+    except OSError:
+        log("another photos.py run is active")
+        return 0
+
     config = load_config()
     manifest = read_json(MANIFEST_FILE, {"photos": []})
     has_album = bool(str(config.get("albumUrl") or "").strip())
