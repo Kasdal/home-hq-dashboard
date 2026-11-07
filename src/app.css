@@ -264,110 +264,139 @@ p {
 /* ---------- masthead ---------- */
 
 .masthead {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 30px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: clamp(22px, 3vw, 44px);
   padding: 2px 4px 0;
 }
 
-.mast-left {
-  flex: 1;
+.mast-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   min-width: 0;
+  border-bottom: 6px solid var(--rule);
+  padding-bottom: 8px;
 }
 
 .mast-time {
+  display: flex;
+  align-items: flex-start;
   font-family: var(--font-display);
-  font-size: clamp(76px, 13.5vh, 160px);
+  font-size: clamp(84px, 16vh, 180px);
   line-height: 0.82;
   letter-spacing: 0.005em;
   font-variant-numeric: tabular-nums;
 }
 
+.mast-digits {
+  display: block;
+}
+
 .mast-suffix {
-  font-size: 0.22em;
-  vertical-align: super;
-  letter-spacing: 0.1em;
-  margin-left: 0.16em;
+  font-size: 0.2em;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  margin-left: 0.14em;
+  padding-top: 0.12em;
 }
 
 .mast-daterow {
   display: flex;
   align-items: baseline;
-  gap: 14px;
-  margin-top: 8px;
+  gap: clamp(10px, 1.2vw, 16px);
+  margin-top: auto;
+  padding-top: clamp(10px, 1.8vh, 18px);
 }
 
 .mast-weekday {
-  font-size: 13px;
+  font-size: clamp(13px, 1.4vh, 18px);
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .mast-date {
   font-family: var(--font-serif);
   font-weight: 400;
-  font-size: 21px;
+  font-size: clamp(26px, 3.4vh, 44px);
+  line-height: 1;
 }
 
-.mast-rule {
-  height: 3px;
-  background: var(--rule);
-  margin-top: 10px;
-}
-
-.mast-right {
-  flex: 0 0 auto;
-  max-width: 46%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  padding-bottom: 4px;
-  text-align: right;
+.mast-weather {
+  position: relative;
+  justify-content: flex-start;
 }
 
 .mast-wx {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: clamp(12px, 1.6vh, 22px);
+}
+
+.mast-icon {
+  display: block;
+  font-size: clamp(56px, 9.6vh, 108px);
+  line-height: 0;
+}
+
+.mast-icon .glyph {
+  width: 0.92em;
+  height: 0.92em;
+  stroke-width: 3;
 }
 
 .mast-temp {
   font-family: var(--font-display);
-  font-size: clamp(62px, 10.5vh, 128px);
+  font-size: clamp(56px, 9.8vh, 110px);
   line-height: 0.8;
+}
+
+.mast-deg {
+  font-size: 0.7em;
+  vertical-align: 0.34em;
+  margin-left: 0.02em;
+  letter-spacing: 0;
 }
 
 .mast-wxtext {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: flex-start;
+  gap: 6px;
   text-align: left;
 }
 
 .mast-cond {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: clamp(14px, 1.8vh, 21px);
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .mast-range {
-  font-size: 13px;
+  font-size: clamp(15px, 1.9vh, 23px);
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .mast-summary {
   font-family: var(--font-serif);
+  font-size: clamp(20px, 3.1vh, 36px);
+  line-height: 1.25;
+  color: var(--ink);
+  margin-top: clamp(8px, 1.2vh, 14px);
+  max-width: 40ch;
+}
+
+.mast-summary em {
   font-style: italic;
-  font-size: 16px;
-  color: var(--ink-soft);
-  margin-top: 2px;
 }
 
 .mast-place {
+  position: absolute;
+  top: 0;
+  right: 0;
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -376,6 +405,10 @@ p {
 
 .glyph .sun {
   stroke: var(--amber);
+}
+
+.glyph .moon {
+  stroke: var(--ink-soft);
 }
 
 .glyph .cloud {
@@ -399,39 +432,45 @@ p {
 .hourly {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-  border-top: 1px solid var(--hairline);
-  margin: 10px 4px 0;
-  padding-top: 9px;
+  width: 100%;
+  gap: 4px;
+  margin-top: clamp(8px, 1.4vh, 16px);
 }
 
 .hour {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 5px 4px;
-  border-radius: 12px;
+  gap: 4px;
+  padding: 0;
   color: var(--ink-soft);
 }
 
 .hour.now {
-  background: var(--tan);
   color: var(--ink);
 }
 
+.hour .glyph {
+  width: clamp(20px, 2.9vh, 34px);
+  height: clamp(20px, 2.9vh, 34px);
+}
+
 .hour-label {
-  min-width: 38px;
-  font-size: 9px;
+  font-size: clamp(9px, 1.1vh, 13px);
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
+.hour.now .hour-label {
+  color: var(--ink);
+}
+
 .hour-temp {
-  font-family: var(--font-display);
-  font-size: 19px;
+  font-size: clamp(15px, 1.9vh, 22px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- today grid ---------- */
@@ -1700,9 +1739,5 @@ code {
 
   .panel {
     padding: 16px 20px;
-  }
-
-  .mast-daterow {
-    margin-top: 10px;
   }
 }

@@ -1,5 +1,5 @@
 <script>
-  let { code = 0, size = 64 } = $props()
+  let { code = 0, size = 64, night = false } = $props()
 
   const group = $derived(
     code === 0 || code === 1
@@ -30,7 +30,9 @@
   aria-hidden="true"
   focusable="false"
 >
-  {#if group === 'sun'}
+  {#if group === 'sun' && night}
+    <path class="moon" d="M40 12a20 20 0 1 0 12 33 15 15 0 0 1-12-33z" />
+  {:else if group === 'sun'}
     <circle class="sun" cx="32" cy="32" r="10.5" />
     {#each [0, 45, 90, 135, 180, 225, 270, 315] as angle}
       <line
@@ -43,11 +45,15 @@
       />
     {/each}
   {:else}
-    {#if group === 'partly'}
-      <circle class="sun" cx="23" cy="23" r="7.5" />
-      <line class="sun" x1="23" y1="8" x2="23" y2="12" />
-      <line class="sun" x1="8" y1="23" x2="12" y2="23" />
-      <line class="sun" x1="12.4" y1="12.4" x2="15.2" y2="15.2" />
+    {#if group === 'partly' || group === 'cloud'}
+      {#if night}
+        <path class="moon" d="M24 4a10 10 0 1 0 8 17 11.5 11.5 0 0 1-8-17z" />
+      {:else if group === 'partly'}
+        <circle class="sun" cx="23" cy="23" r="7.5" />
+        <line class="sun" x1="23" y1="8" x2="23" y2="12" />
+        <line class="sun" x1="8" y1="23" x2="12" y2="23" />
+        <line class="sun" x1="12.4" y1="12.4" x2="15.2" y2="15.2" />
+      {/if}
     {/if}
     <path class="cloud" d="M20 43h24a9.5 9.5 0 0 0 1-19 13.5 13.5 0 0 0-25.5 2.5A8.5 8.5 0 0 0 20 43z" />
     {#if group === 'rain'}

@@ -29,6 +29,25 @@ function hourLabel(value) {
   return `${hour} ${date.getHours() >= 12 ? 'PM' : 'AM'}`
 }
 
+function shortHourLabel(value) {
+  const date = parseLocal(value)
+  if (!date) return ''
+  const hour = date.getHours() % 12 || 12
+  return `${hour}${date.getHours() >= 12 ? 'P' : 'A'}`
+}
+
+function buildDayWindows(daily) {
+  const map = new Map()
+  if (!daily || !Array.isArray(daily.sunrise) || !Array.isArray(daily.sunset)) return map
+  for (let i = 0; i < daily.sunrise.length; i += 1) {
+    const rise = parseLocal(daily.sunrise[i])
+    const set = parseLocal(daily.sunset[i])
+    if (!rise || !set) continue
+    map.set(daily.sunrise[i].slice(0, 10), { rise, set })
+  }
+  return map
+}
+
 function buildSummary(hourly, code) {
   const upcoming = hourly.filter((item) => !item.now).slice(0, 6)
   const wet = upcoming.filter((item) => item.pop >= 45 || RAIN_CODES.has(item.code))
@@ -36,7 +55,7 @@ function buildSummary(hourly, code) {
   if (wet.length > 0) {
     const last = wet[wet.length - 1]
     if (wet.length >= 6) return 'Rain for the next few hours. Umbrella weather.'
-    if (last) return `Rain until ${last.label}. Umbrella weather.`
+    if (last) return `Rain until ${last.full}. Umbrella weather.`
     return 'Rain soon. Take the umbrella.'
   }
 
@@ -52,6 +71,7 @@ function buildHourly(data) {
   const list = data.hourly
   if (!list || !Array.isArray(list.time)) return []
 
+  const windows = buildDayWindows(data.daily)
   const current = data.current && data.current.time ? data.current.time : null
   let start = list.time.findIndex((value) => current && value.slice(0, 13) === current.slice(0, 13))
   if (start < 0) {
@@ -65,13 +85,17 @@ function buildHourly(data) {
 
   const out = []
   for (let i = start; i < Math.min(start + 7, list.time.length); i += 1) {
+    const date = parseLocal(list.time[i])
+    const window = date ? windows.get(list.time[i].slice(0, 10)) : null
     out.push({
-      label: i === start ? 'NOW' : hourLabel(list.time[i]),
+      label: i === start ? 'NOW' : shortHourLabel(list.time[i]),
+      full: hourLabel(list.time[i]),
       time: list.time[i],
       temp: Math.round(list.temperature_2m[i]),
       code: list.weather_code[i],
       pop: list.precipitation_probability ? list.precipitation_probability[i] : 0,
       now: i === start,
+      night: window ? date < window.rise || date >= window.set : false,
     })
   }
   return out
