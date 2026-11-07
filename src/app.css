@@ -1200,13 +1200,6 @@ p {
   stroke: #ffd27a;
 }
 
-.sleep-suffix {
-  font-size: 0.2em;
-  letter-spacing: 0.08em;
-  margin-left: 0.12em;
-  vertical-align: super;
-}
-
 .sleep-deg {
   font-size: 0.7em;
   vertical-align: 0.34em;

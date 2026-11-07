@@ -3,7 +3,7 @@
   import { photosState, advancePhoto } from '../photos.svelte.js'
   import { wake } from '../idle.svelte.js'
   import { clock } from '../clock.svelte.js'
-  import { clockParts } from '../time.js'
+  import { formatTime } from '../time.js'
   import { weather, currentCondition } from '../weather.svelte.js'
   import WeatherGlyph from './WeatherGlyph.svelte'
 
@@ -12,7 +12,7 @@
   let failed = $state(0)
 
   const current = $derived(photosState.photos[photosState.index] || null)
-  const parts = $derived(clockParts(clock.now))
+  const time = $derived(formatTime(clock.now))
   const temp = $derived(weather.current ? Math.round(weather.current.temperature_2m) : null)
   const cond = $derived(currentCondition())
   const code = $derived(weather.current ? weather.current.weather_code : 0)
@@ -86,7 +86,7 @@
   {/if}
 
   <div class="sleep-info" aria-hidden="true">
-    <div class="sleep-time">{parts.time}<span class="sleep-suffix">{parts.suffix}</span></div>
+    <div class="sleep-time">{time}</div>
     {#if temp !== null}
       <div class="sleep-wx">
         <div class="sleep-temp">{temp}<span class="sleep-deg">°</span></div>
