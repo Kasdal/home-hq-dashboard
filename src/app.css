@@ -293,14 +293,6 @@ p {
   display: block;
 }
 
-.mast-suffix {
-  font-size: 0.2em;
-  line-height: 1;
-  letter-spacing: 0.08em;
-  margin-left: 0.14em;
-  padding-top: 0.12em;
-}
-
 .mast-daterow {
   display: flex;
   align-items: baseline;

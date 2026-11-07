@@ -3,6 +3,7 @@
   import { build } from '../version.svelte.js'
   import { weather } from '../weather.svelte.js'
   import { simulation } from '../clock.svelte.js'
+  import { formatLongDate, formatTime } from '../time.js'
 
   const options = [
     { id: 'light', label: 'Light' },
@@ -48,7 +49,7 @@
       <dd>{theme.resolved} ({theme.mode})</dd>
       {#if simulation.active}
         <dt>Simulation</dt>
-        <dd>{simulation.start ? simulation.start.toLocaleString() : ''}</dd>
+        <dd>{simulation.start ? `${formatLongDate(simulation.start)} ${formatTime(simulation.start)}` : ''}</dd>
       {/if}
     </dl>
   </section>

@@ -66,20 +66,12 @@ export function formatTime(value) {
 
 export function clockParts(value = new Date()) {
   const hours = value.getHours()
-  const hour12 = hours % 12 || 12
   return {
-    time: `${hour12}:${pad(value.getMinutes())}`,
-    suffix: hours >= 12 ? 'PM' : 'AM',
+    time: `${pad(hours)}:${pad(value.getMinutes())}`,
     weekday: WEEKDAYS[value.getDay()],
     month: MONTHS[value.getMonth()],
     day: value.getDate(),
   }
-}
-
-export function shortHour(value) {
-  const d = value instanceof Date ? value : new Date(value)
-  const hour12 = d.getHours() % 12 || 12
-  return `${hour12} ${d.getHours() >= 12 ? 'PM' : 'AM'}`
 }
 
 export function relativeDay(value, now = new Date()) {

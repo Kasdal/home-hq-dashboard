@@ -23,7 +23,7 @@
 <header class="masthead">
   <div class="mast-col mast-clock">
     <div class="mast-time">
-      <span class="mast-digits">{parts.time}</span><span class="mast-suffix">{parts.suffix}</span>
+      <span class="mast-digits">{parts.time}</span>
     </div>
     <div class="mast-daterow">
       <span class="mast-weekday">{parts.weekday}</span>

@@ -25,15 +25,13 @@ function parseLocal(value) {
 function hourLabel(value) {
   const date = parseLocal(value)
   if (!date) return ''
-  const hour = date.getHours() % 12 || 12
-  return `${hour} ${date.getHours() >= 12 ? 'PM' : 'AM'}`
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 function shortHourLabel(value) {
   const date = parseLocal(value)
   if (!date) return ''
-  const hour = date.getHours() % 12 || 12
-  return `${hour}${date.getHours() >= 12 ? 'P' : 'A'}`
+  return String(date.getHours()).padStart(2, '0')
 }
 
 function buildDayWindows(daily) {
