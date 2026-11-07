@@ -8,6 +8,10 @@ export const DEFAULTS = {
   longitude: null,
   timezone: 'auto',
   catName: 'Smrdljivi',
+  cat: {
+    hungry: 'https://media.tenor.com/0rPjitCLTt8AAAAM/cute-kitten.gif',
+    fed: 'https://i.pinimg.com/736x/88/d2/e3/88d2e3118b3ce0bf527f9ed492f91698.jpg',
+  },
   theme: {
     lightStart: '06:00',
     darkStart: '18:00',
@@ -23,10 +27,11 @@ export async function loadConfig() {
     cached = {
       ...DEFAULTS,
       ...data,
+      cat: { ...DEFAULTS.cat, ...(data.cat || {}) },
       theme: { ...DEFAULTS.theme, ...(data.theme || {}) },
     }
   } catch {
-    cached = { ...DEFAULTS, theme: { ...DEFAULTS.theme } }
+    cached = { ...DEFAULTS, cat: { ...DEFAULTS.cat }, theme: { ...DEFAULTS.theme } }
   }
   return cached
 }
