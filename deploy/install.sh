@@ -19,6 +19,7 @@ install -m 644 "${HERE}/nginx.conf" "${BASE}/nginx.conf"
 install -m 755 "${HERE}/pull.sh" "${BASE}/pull.sh"
 install -m 755 "${HERE}/photos.py" "${BASE}/photos.py"
 install -m 755 "${HERE}/google_album.py" "${BASE}/google_album.py"
+install -m 755 "${HERE}/nest.py" "${BASE}/nest.py"
 install -m 755 "${HERE}/api.py" "${BASE}/api.py"
 
 # Remove the retired calendar job and script.
@@ -125,8 +126,12 @@ add_cron() {
 
 add_cron "*/5 * * * * ${BASE}/pull.sh >> ${BASE}/pull.log 2>&1" "${BASE}/pull.sh"
 add_cron "*/10 * * * * python3 ${BASE}/photos.py >> ${BASE}/photos.log 2>&1" "${BASE}/photos.py"
+add_cron "*/5 * * * * python3 ${BASE}/nest.py >> ${BASE}/nest.log 2>&1" "${BASE}/nest.py"
 
 python3 "${BASE}/photos.py" || true
+if [ -f "${BASE}/data/nest-credentials.json" ]; then
+    python3 "${BASE}/nest.py" || true
+fi
 
 if [ -d "${BASE}/repo/.git" ]; then
     "${BASE}/pull.sh"

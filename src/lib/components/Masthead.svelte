@@ -3,6 +3,7 @@
   import { weather, currentCondition } from '../weather.svelte.js'
   import { clockParts } from '../time.js'
   import WeatherGlyph from './WeatherGlyph.svelte'
+  import { nest } from '../nest.svelte.js'
 
   const parts = $derived(clockParts(clock.now))
   const cond = $derived(currentCondition())
@@ -18,9 +19,13 @@
     if (cut < 0) return { lead: text, rest: '' }
     return { lead: text.slice(0, cut + 1), rest: text.slice(cut + 2) }
   })
+
+  function indoor(value) {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1)
+  }
 </script>
 
-<header class="masthead">
+<header class="masthead" class:has-inside={nest.status === 'ok'}>
   <div class="mast-col mast-clock">
     <div class="mast-time">
       <span class="mast-digits">{parts.time}</span>
@@ -70,4 +75,14 @@
       <div class="mast-summary">Loading the forecast.</div>
     {/if}
   </div>
+
+  {#if nest.status === 'ok'}
+    <div class="mast-col mast-inside">
+      <div class="mast-inside-head">Inside</div>
+      <div class="mast-inside-temp">{indoor(nest.temperature)}<span class="mast-deg">°</span></div>
+      {#if nest.target !== null}
+        <div class="mast-inside-sub">Set {indoor(nest.target)}°</div>
+      {/if}
+    </div>
+  {/if}
 </header>

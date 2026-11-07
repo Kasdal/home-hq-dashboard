@@ -88,6 +88,8 @@ Put the private JSON files in `~/homehq/data`. The page requests them from
 | `bins.json` | Bin schedule and alert, see below |
 | `state.json` | Bin confirmations, written by the API |
 | `controls.json` | `{"controls":[{"id":"lights","label":"Lights","url":"http://.../run","icon":"L"}]}` |
+| `nest.json` | Indoor temperature, written by `nest.py` |
+| `nest-credentials.json` | Nest login secrets, private, see below |
 
 Keep `config.json` out of the public repository. It holds the home location.
 
@@ -242,6 +244,60 @@ agrees. A new date has no confirmation, so the alert starts fresh.
 GET  /api/state   -> {"bins":{"2026-11-12":{"confirmedAt":"..."}}}
 POST /api/state   -> {"bin":{"date":"2026-11-12","confirmedAt":"2026-11-12T07:42:00"}}
 ```
+
+### Nest thermostat
+
+`nest.py` reads the indoor temperature every 5 minutes and writes `nest.json`.
+It uses the unofficial Nest web API, the same one the Nest app uses. Google can
+change it at any time. This is not the official Device Access API and needs no
+$5 fee.
+
+Secrets live in `~/homehq/data/nest-credentials.json` with mode 600. Never
+commit it.
+
+Google account, made or migrated after August 2019:
+
+1. Use a Firefox private window. Chromium browsers copy a device-bound session
+   that stops working after a few hours.
+2. Open `home.nest.com` and sign in. Turn off Enhanced Tracking Protection for
+   the site if the sign-in loops.
+3. In Developer Tools, Network tab, filter `issueToken`. Open the request.
+4. Copy the request URL. That value is `issue_token`.
+5. Copy the `Cookie` request header value. It must include `SID=`. That value
+   is `cookies`.
+6. Close the private window without signing out.
+
+```json
+{
+  "type": "google",
+  "issue_token": "https://accounts.google.com/...",
+  "cookies": "SID=...; HSID=...; ..."
+}
+```
+
+Legacy Nest account, not migrated to Google:
+
+1. Sign in at `home.nest.com`.
+2. Open `https://home.nest.com/session`.
+3. Copy `access_token` from the JSON text.
+
+```json
+{ "type": "nest", "access_token": "b..." }
+```
+
+Run it, then check the output and the log:
+
+```bash
+chmod 600 ~/homehq/data/nest-credentials.json
+python3 ~/homehq/nest.py
+cat ~/homehq/data/nest.json
+tail -5 ~/homehq/nest.log
+```
+
+The installer adds the 5-minute cron. Cookies expire. If the log shows an
+authentication error, extract the values again and replace the cookies. The page
+hides the INSIDE block when `nest.json` is missing, and keeps the last value when
+a poll fails.
 
 ### Tasks and controls
 

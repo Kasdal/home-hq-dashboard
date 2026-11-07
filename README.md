@@ -31,6 +31,7 @@ The navigation rail uses hash routes: `#today`, `#shopping`, `#photos`,
 | Tasks | `/data/tasks.json` |
 | Photos | Google Photos album, cache or local folder |
 | Cat feeding | Two rounds per day, stored in the browser |
+| Inside temperature | Nest thermostat, from `/data/nest.json` |
 | Home controls | `/data/controls.json` |
 
 Private data comes from the NAS at runtime. The repository stays public and

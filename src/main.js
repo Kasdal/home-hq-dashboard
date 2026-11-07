@@ -9,6 +9,7 @@ import { startShopping } from './lib/shopping.svelte.js'
 import { startControls } from './lib/controls.svelte.js'
 import { startBins, bins } from './lib/bins.svelte.js'
 import { startPhotos } from './lib/photos.svelte.js'
+import { startNest } from './lib/nest.svelte.js'
 import { loadConfig } from './lib/config.js'
 import { startIdleWatch, idle, idleDebug } from './lib/idle.svelte.js'
 import { startVersionWatch } from './lib/version.svelte.js'
@@ -20,6 +21,7 @@ startShopping()
 startControls()
 startBins()
 startPhotos()
+startNest()
 startVersionWatch()
 
 loadConfig().then((config) => {

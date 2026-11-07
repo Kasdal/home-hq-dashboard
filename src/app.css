@@ -270,6 +270,10 @@ p {
   padding: 2px 4px 0;
 }
 
+.masthead.has-inside {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
 .mast-col {
   display: flex;
   flex-direction: column;
@@ -393,6 +397,32 @@ p {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.mast-inside {
+  min-width: clamp(120px, 11vw, 190px);
+  gap: 2px;
+}
+
+.mast-inside-head {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.mast-inside-temp {
+  font-family: var(--font-display);
+  font-size: clamp(54px, 8.6vh, 96px);
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.mast-inside-sub {
+  font-size: clamp(12px, 1.4vh, 16px);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .glyph .sun {
