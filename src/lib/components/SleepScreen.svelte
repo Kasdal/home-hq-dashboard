@@ -4,7 +4,8 @@
   import { wake } from '../idle.svelte.js'
   import { clock } from '../clock.svelte.js'
   import { clockParts } from '../time.js'
-  import { weather } from '../weather.svelte.js'
+  import { weather, currentCondition } from '../weather.svelte.js'
+  import WeatherGlyph from './WeatherGlyph.svelte'
 
   let active = $state(0)
   let layers = $state(['', ''])
@@ -13,6 +14,18 @@
   const current = $derived(photosState.photos[photosState.index] || null)
   const parts = $derived(clockParts(clock.now))
   const temp = $derived(weather.current ? Math.round(weather.current.temperature_2m) : null)
+  const cond = $derived(currentCondition())
+  const code = $derived(weather.current ? weather.current.weather_code : 0)
+  const night = $derived(weather.current ? weather.current.is_day === 0 : false)
+
+  function warmth(value) {
+    if (value <= 0) return 'Freezing'
+    if (value <= 5) return 'Cold'
+    if (value <= 12) return 'Cool'
+    if (value <= 18) return 'Mild'
+    if (value <= 24) return 'Warm'
+    return 'Hot'
+  }
 
   $effect(() => {
     const photo = current
@@ -75,7 +88,13 @@
   <div class="sleep-info" aria-hidden="true">
     <div class="sleep-time">{parts.time}<span class="sleep-suffix">{parts.suffix}</span></div>
     {#if temp !== null}
-      <div class="sleep-temp">{temp}<span class="sleep-deg">°</span></div>
+      <div class="sleep-wx">
+        <div class="sleep-temp">{temp}<span class="sleep-deg">°</span></div>
+        <div class="sleep-cond">
+          <WeatherGlyph code={code} night={night} size={34} />
+          <span>{warmth(temp)} · {cond.label}</span>
+        </div>
+      </div>
     {/if}
   </div>
 </button>

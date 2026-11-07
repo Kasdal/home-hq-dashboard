@@ -67,8 +67,8 @@ official API. See [deploy/README.md](deploy/README.md).
 
 After two minutes without a tap or key, the dashboard becomes a full-screen
 photo slideshow. Photos crossfade and fit the screen, with no zoom or crop. The
-time shows on the left and the temperature on the right. A tap or key returns to
-the dashboard.
+time shows at the bottom left. The temperature, a warmth word and the condition
+show at the bottom right. A tap or key returns to the dashboard.
 
 Set `sleepAfterMinutes` in `/data/config.json` to change the delay. Use `0` to
 turn the sleep screen off. With no photos loaded, the dashboard stays awake.
