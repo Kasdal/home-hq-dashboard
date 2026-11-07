@@ -1,0 +1,15 @@
+# Private handoff with LAN details. Do not publish.
+HANDOFF.md
+
+# Node and build output
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+
+# Local data for development. It may hold private values.
+public/data/
+
+# OS files
+Thumbs.db
+.DS_Store

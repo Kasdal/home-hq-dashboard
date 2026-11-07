@@ -1,0 +1,101 @@
+const DAY_MS = 86400000
+
+export const PICKUP_WEEKDAY = 4 // Thursday
+export const BLACK_REFERENCE = '2026-11-12' // First black-bin pickup.
+
+export const WEEKDAYS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+]
+
+export const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+
+const pad = (n) => String(n).padStart(2, '0')
+
+export function ymd(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+export function parseYmd(value) {
+  const [y, m, d] = value.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function utc(value) {
+  const [y, m, d] = value.split('-').map(Number)
+  return Date.UTC(y, m - 1, d)
+}
+
+export function startOfDay(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+export function daysBetween(fromYmd, toYmd) {
+  return Math.round((utc(toYmd) - utc(fromYmd)) / DAY_MS)
+}
+
+export function formatLongDate(value) {
+  const d = typeof value === 'string' ? parseYmd(value) : value
+  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`
+}
+
+export function formatShortDate(value) {
+  const d = typeof value === 'string' ? parseYmd(value) : value
+  return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`
+}
+
+export function formatTime(value) {
+  const d = value instanceof Date ? value : new Date(value)
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// The pickup is every Thursday. If today is Thursday, it is today.
+function nextThursday(from) {
+  const d = startOfDay(from)
+  const diff = (PICKUP_WEEKDAY - d.getDay() + 7) % 7
+  d.setDate(d.getDate() + diff)
+  return d
+}
+
+export function binFor(value) {
+  const weeks = Math.round((utc(value) - utc(BLACK_REFERENCE)) / (7 * DAY_MS))
+  return ((weeks % 2) + 2) % 2 === 0 ? 'black' : 'green'
+}
+
+export function upcomingPickups(count = 4, from = new Date()) {
+  const first = nextThursday(from)
+  const out = []
+  for (let i = 0; i < count; i += 1) {
+    const d = new Date(first)
+    d.setDate(first.getDate() + i * 7)
+    const date = ymd(d)
+    out.push({ date, bin: binFor(date) })
+  }
+  return out
+}
+
+export function relativeDay(value, now = new Date()) {
+  const days = daysBetween(ymd(startOfDay(now)), value)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Tomorrow'
+  if (days === -1) return 'Yesterday'
+  return `In ${days} days`
+}

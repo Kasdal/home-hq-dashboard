@@ -1,0 +1,18 @@
+{
+  "name": "home-hq-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Private family dashboard for the PF1007L photo frame",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "node scripts/check-schedule.mjs",
+    "preview": "vite preview --host 0.0.0.0 --port 4173"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "svelte": "^5.57.3",
+    "vite": "^8.3.6"
+  }
+}
