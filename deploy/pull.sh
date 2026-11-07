@@ -19,15 +19,18 @@ git fetch --depth 1 origin gh-pages
 git reset --hard origin/gh-pages
 
 SHA=$(git rev-parse --short HEAD)
-DEST="${BASE}/releases/${SHA}"
+REL="releases/${SHA}"
+DEST="${BASE}/${REL}"
 
 if [ ! -d "${DEST}" ]; then
     mkdir -p "${DEST}"
     git archive HEAD | tar -x -C "${DEST}"
 fi
 
-if [ "$(readlink "${BASE}/current")" != "${DEST}" ]; then
-    ln -sfn "${DEST}" "${BASE}/current.new"
+# The symlink must be relative. The folder is mounted at /site in the container,
+# so an absolute /home/... target would not resolve there.
+if [ "$(readlink "${BASE}/current")" != "${REL}" ]; then
+    ln -sfn "${REL}" "${BASE}/current.new"
     mv -Tf "${BASE}/current.new" "${BASE}/current"
     echo "$(date -Is) switched to ${SHA}"
 fi

@@ -40,8 +40,8 @@ if [ ! -f "${BASE}/releases/bootstrap/index.html" ]; then
 HTML
 fi
 
-if [ ! -e "${BASE}/current" ]; then
-    ln -sfn "${BASE}/releases/bootstrap" "${BASE}/current"
+if [ ! -L "${BASE}/current" ] || [ ! -e "${BASE}/current" ]; then
+    ln -sfn "releases/bootstrap" "${BASE}/current"
 fi
 
 # Pull the built site once, if the gh-pages branch exists.
@@ -67,7 +67,7 @@ docker run -d \
 # Install the pull timer if it is not present.
 CRON_LINE="*/5 * * * * ${BASE}/pull.sh >> ${BASE}/pull.log 2>&1"
 if ! crontab -l 2>/dev/null | grep -F "${BASE}/pull.sh" >/dev/null; then
-    (crontab -l 2>/dev/null; echo "${CRON_LINE}") | crontab -
+    { crontab -l 2>/dev/null || true; echo "${CRON_LINE}"; } | crontab -
     echo "Cron entry added."
 fi
 
