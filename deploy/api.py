@@ -41,6 +41,7 @@ def write_doc(doc):
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temp_path, FILE)
+        os.chmod(FILE, 0o644)
     except Exception:
         try:
             os.unlink(temp_path)

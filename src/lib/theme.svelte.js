@@ -58,6 +58,8 @@ export function initTheme() {
     saved = null
   }
   if (saved === 'light' || saved === 'dark' || saved === 'auto') theme.mode = saved
+  // Light is the design default. Auto stays available in Settings.
+  else theme.mode = 'light'
   applyTheme()
 
   try {

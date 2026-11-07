@@ -22,7 +22,7 @@ install -m 755 "${HERE}/api.py" "${BASE}/api.py"
 
 # Remove the retired calendar job and script.
 if crontab -l 2>/dev/null | grep -F "fetch-calendar.py" >/dev/null; then
-    crontab -l 2>/dev/null | grep -v -F "fetch-calendar.py" | crontab - || true
+    { crontab -l 2>/dev/null | grep -v -F "fetch-calendar.py" || true; } | crontab - || true
     echo "Removed the old calendar cron job."
 fi
 rm -f "${BASE}/fetch-calendar.py"

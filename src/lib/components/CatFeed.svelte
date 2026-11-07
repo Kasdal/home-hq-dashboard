@@ -53,7 +53,7 @@
               fill="currentColor"
             />
           </svg>
-          Jeo, potvrdi
+          POTVRDI
         </button>
       {/if}
     </div>
