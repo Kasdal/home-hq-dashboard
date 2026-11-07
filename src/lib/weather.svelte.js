@@ -1,6 +1,5 @@
 import { fetchJson } from './http.js'
 import { loadConfig } from './config.js'
-import { setDaylight } from './theme.svelte.js'
 import { describeWeather } from './weather.js'
 
 export const weather = $state({
@@ -104,10 +103,6 @@ export async function loadWeather() {
     weather.summary = buildSummary(weather.hourly, data.current ? data.current.weather_code : 3)
     weather.updated = Date.now()
     weather.status = 'ok'
-
-    const sunrise = data.daily && data.daily.sunrise ? parseLocal(data.daily.sunrise[0]) : null
-    const sunset = data.daily && data.daily.sunset ? parseLocal(data.daily.sunset[0]) : null
-    if (sunrise && sunset) setDaylight(sunrise, sunset)
   } catch {
     if (!weather.current) weather.status = 'offline'
   }

@@ -13,11 +13,12 @@ REPO_URL="https://github.com/Kasdal/home-hq-dashboard.git"
 
 echo "Base directory: ${BASE}"
 
-mkdir -p "${BASE}/releases/bootstrap" "${BASE}/data/photos"
+mkdir -p "${BASE}/releases/bootstrap" "${BASE}/data/photos" "${BASE}/data/photo-cache"
 
 install -m 644 "${HERE}/nginx.conf" "${BASE}/nginx.conf"
 install -m 755 "${HERE}/pull.sh" "${BASE}/pull.sh"
 install -m 755 "${HERE}/photos.py" "${BASE}/photos.py"
+install -m 755 "${HERE}/google_album.py" "${BASE}/google_album.py"
 install -m 755 "${HERE}/api.py" "${BASE}/api.py"
 
 # Remove the retired calendar job and script.
@@ -30,6 +31,23 @@ rm -f "${BASE}/fetch-calendar.py"
 if [ ! -f "${BASE}/data/shopping.json" ]; then
     install -m 644 "${HERE}/sample-shopping.json" "${BASE}/data/shopping.json"
     echo "Installed the sample shopping list."
+fi
+
+# photos.json is the album config now. Move an old generated list out of the way.
+if [ -f "${BASE}/data/photos.json" ] && ! grep -q '"albumUrl"' "${BASE}/data/photos.json"; then
+    mv "${BASE}/data/photos.json" "${BASE}/data/photos.json.legacy"
+    echo "Moved the old photo list to photos.json.legacy."
+fi
+if [ ! -f "${BASE}/data/photos.json" ]; then
+    cat > "${BASE}/data/photos.json" <<'JSON'
+{
+  "albumUrl": "",
+  "refreshMinutes": 60,
+  "intervalSeconds": 20
+}
+JSON
+    chmod 644 "${BASE}/data/photos.json"
+    echo "Wrote the photos.json template. Add an albumUrl."
 fi
 
 if [ ! -f "${BASE}/releases/bootstrap/index.html" ]; then

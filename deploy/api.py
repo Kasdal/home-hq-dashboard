@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Minimal shopping-list API for the Home HQ dashboard.
+"""Minimal data API for the Home HQ dashboard.
 
-GET  /shopping  -> the current list
-POST /shopping  -> replace the list and return it with a new revision
+GET  /shopping  -> the current shopping list
+POST /shopping  -> replace the shopping list
+GET  /state     -> shared state (bin confirmations)
+POST /state     -> confirm one bin day
 
-The file is written with a temporary file and os.replace, so a reader never
-sees a half-written list. Only the standard library is used.
+Files are written with a temporary file and os.replace, so a reader never sees
+a half-written document. Only the standard library is used.
 """
 
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -17,31 +20,38 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
-FILE = os.path.join(DATA_DIR, "shopping.json")
+SHOPPING_FILE = os.path.join(DATA_DIR, "shopping.json")
+STATE_FILE = os.path.join(DATA_DIR, "state.json")
 PORT = int(os.environ.get("PORT", "8099"))
 MAX_BODY = 128 * 1024
+STATE_KEEP_DAYS = 60
 
 LOCK = threading.Lock()
 
-DEFAULT_DOC = {
+DEFAULT_SHOPPING = {
     "rev": 1,
     "stores": [{"id": "tesco", "name": "Tesco"}, {"id": "lidl", "name": "Lidl"}],
     "items": [],
     "usuals": [],
 }
 
+DEFAULT_STATE = {"bins": {}}
 
-def write_doc(doc):
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+STAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$")
+
+
+def write_doc(path, doc):
     os.makedirs(DATA_DIR, exist_ok=True)
-    handle, temp_path = tempfile.mkstemp(dir=DATA_DIR, prefix=".shopping-", suffix=".tmp")
+    handle, temp_path = tempfile.mkstemp(dir=DATA_DIR, prefix=".homehq-", suffix=".tmp")
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
             json.dump(doc, stream, ensure_ascii=False, indent=1)
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temp_path, FILE)
-        os.chmod(FILE, 0o644)
+        os.replace(temp_path, path)
+        os.chmod(path, 0o644)
     except Exception:
         try:
             os.unlink(temp_path)
@@ -50,23 +60,21 @@ def write_doc(doc):
         raise
 
 
-def read_doc():
+def read_doc(path, default):
     try:
-        with open(FILE, encoding="utf-8") as stream:
+        with open(path, encoding="utf-8-sig") as stream:
             data = json.load(stream)
-        if not isinstance(data, dict):
-            raise ValueError("not an object")
-        return data
+        return data if isinstance(data, dict) else dict(default)
     except FileNotFoundError:
         with LOCK:
-            doc = dict(DEFAULT_DOC)
-            write_doc(doc)
+            doc = dict(default)
+            write_doc(path, doc)
         return doc
     except Exception:
-        return dict(DEFAULT_DOC)
+        return dict(default)
 
 
-def validate(doc):
+def validate_shopping(doc):
     if not isinstance(doc, dict):
         raise ValueError("body must be an object")
 
@@ -82,8 +90,7 @@ def validate(doc):
     for item in items:
         if not isinstance(item, dict):
             continue
-        name = str(item.get("name", "")).strip()
-        if not name:
+        if not str(item.get("name", "")).strip():
             continue
         clean_items.append(item)
 
@@ -91,8 +98,7 @@ def validate(doc):
     for usual in usuals:
         if not isinstance(usual, dict):
             continue
-        name = str(usual.get("name", "")).strip()
-        if not name:
+        if not str(usual.get("name", "")).strip():
             continue
         clean_usuals.append(usual)
 
@@ -104,14 +110,29 @@ def validate(doc):
 
     return {
         "rev": int(time.time()),
-        "stores": clean_stores or DEFAULT_DOC["stores"],
+        "stores": clean_stores or DEFAULT_SHOPPING["stores"],
         "items": clean_items,
         "usuals": clean_usuals,
     }
 
 
+def prune_state(doc):
+    bins = doc.get("bins")
+    if not isinstance(bins, dict):
+        return {"bins": {}}
+
+    cutoff = time.strftime("%Y-%m-%d", time.localtime(time.time() - STATE_KEEP_DAYS * 86400))
+    kept = {}
+    for date, entry in bins.items():
+        if not DATE_RE.match(str(date)) or str(date) < cutoff:
+            continue
+        if isinstance(entry, dict) and entry.get("confirmedAt"):
+            kept[str(date)] = {"confirmedAt": str(entry["confirmedAt"])[:19]}
+    return {"bins": kept}
+
+
 class Handler(BaseHTTPRequestHandler):
-    server_version = "HomeHQ/1.0"
+    server_version = "HomeHQ/1.1"
 
     def send_json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -123,43 +144,90 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path.rstrip("/") == "/health":
+        path = self.path.rstrip("/")
+
+        if path == "/health":
             self.send_json(200, {"ok": True})
             return
-        if self.path.rstrip("/") != "/shopping":
-            self.send_json(404, {"error": "not found"})
+
+        if path == "/shopping":
+            self.send_json(200, read_doc(SHOPPING_FILE, DEFAULT_SHOPPING))
             return
-        self.send_json(200, read_doc())
+
+        if path == "/state":
+            doc = read_doc(STATE_FILE, DEFAULT_STATE)
+            doc = prune_state(doc)
+            self.send_json(200, doc)
+            return
+
+        self.send_json(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path.rstrip("/") != "/shopping":
-            self.send_json(404, {"error": "not found"})
-            return
+        path = self.path.rstrip("/")
 
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = 0
+
         if length <= 0 or length > MAX_BODY:
             self.send_json(413, {"error": "body too large or empty"})
             return
 
         try:
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            clean = validate(payload)
         except Exception as error:
-            self.send_json(400, {"error": str(error)})
+            self.send_json(400, {"error": "bad JSON: %s" % type(error).__name__})
             return
 
-        with LOCK:
+        if path == "/shopping":
             try:
-                write_doc(clean)
+                clean = validate_shopping(payload)
             except Exception as error:
-                self.send_json(500, {"error": "write failed: %s" % type(error).__name__})
+                self.send_json(400, {"error": str(error)})
                 return
 
-        print("saved %d items" % len(clean["items"]), flush=True)
-        self.send_json(200, clean)
+            with LOCK:
+                try:
+                    write_doc(SHOPPING_FILE, clean)
+                except Exception as error:
+                    self.send_json(500, {"error": "write failed: %s" % type(error).__name__})
+                    return
+
+            print("shopping: saved %d items" % len(clean["items"]), flush=True)
+            self.send_json(200, clean)
+            return
+
+        if path == "/state":
+            bin_entry = payload.get("bin") if isinstance(payload, dict) else None
+            if not isinstance(bin_entry, dict):
+                self.send_json(400, {"error": "expected {bin:{date,confirmedAt}}"})
+                return
+
+            date = str(bin_entry.get("date", ""))
+            confirmed = str(bin_entry.get("confirmedAt", ""))
+
+            if not DATE_RE.match(date):
+                self.send_json(400, {"error": "date must be YYYY-MM-DD"})
+                return
+            if not STAMP_RE.match(confirmed):
+                self.send_json(400, {"error": "confirmedAt must be a local date-time"})
+                return
+
+            with LOCK:
+                doc = prune_state(read_doc(STATE_FILE, DEFAULT_STATE))
+                doc["bins"][date] = {"confirmedAt": confirmed[:19]}
+                try:
+                    write_doc(STATE_FILE, doc)
+                except Exception as error:
+                    self.send_json(500, {"error": "write failed: %s" % type(error).__name__})
+                    return
+
+            print("state: bin %s confirmed" % date, flush=True)
+            self.send_json(200, doc)
+            return
+
+        self.send_json(404, {"error": "not found"})
 
     def log_message(self, fmt, *args):
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
@@ -167,9 +235,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
-    if not os.path.exists(FILE):
-        write_doc(dict(DEFAULT_DOC))
-    print("shopping api on port %d, file %s" % (PORT, FILE), flush=True)
+    read_doc(SHOPPING_FILE, DEFAULT_SHOPPING)
+    read_doc(STATE_FILE, DEFAULT_STATE)
+    print("homehq api on port %d, data %s" % (PORT, DATA_DIR), flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
 

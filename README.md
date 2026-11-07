@@ -26,10 +26,10 @@ The navigation rail uses hash routes: `#today`, `#shopping`, `#photos`,
 | Widget | Source |
 | --- | --- |
 | Clock and weather | Device clock, Open-Meteo (no API key), hourly strip |
-| Garbage bins | Built-in Thursday schedule, alternating black and green |
+| Garbage bins | Thursday schedule from `/data/bins.json`, with bin-day alert |
 | Shopping | `/data/shopping.json` through `/api/shopping` |
 | Tasks | `/data/tasks.json` |
-| Photos | `/data/photos.json` |
+| Photos | Google Photos album, cache or local folder |
 | Cat feeding | Two rounds per day, stored in the browser |
 | Home controls | `/data/controls.json` |
 
@@ -38,12 +38,30 @@ holds no secrets, home address or location.
 
 ## Theme
 
-Light is the default from `prefers-color-scheme`. The Settings page offers
-Light, Auto and Dark. Auto follows the device and turns dark after sunset,
-using the sunset time from the forecast. The choice is stored in the browser.
+Auto is the default. It uses light 06:00–18:00 and dark outside that window,
+in the local time zone. Both times come from `theme` in `/data/config.json`.
+The Settings page offers Light, Auto and Dark. The choice is stored in the
+browser. Auto rechecks every 15 seconds and fades between themes without a
+reload.
 
 Fonts are served from the NAS: Anton and Playfair Display, both under the SIL
 Open Font License. See `public/fonts/OFL.txt`.
+
+## Photos
+
+`/data/photos.json` holds a public Google Photos album link. A NAS job fetches
+the share page, caches the images at 1920x1080 and rebuilds the slideshow
+index. The cache keeps the wall display working when the network drops. If the
+album cannot be read, the card shows the cached photos or a clear message.
+
+Google closed programmatic album access in March 2025: the Library API only
+returns app-created albums, and the Picker API needs a person to select photos.
+The share-page importer is unofficial. It lives in `deploy/google_album.py`, so
+a format change touches one file.
+
+Fallback: put JPG, PNG or WebP files in `~/homehq/data/photos`. A shared Google
+Drive folder is more reliable than a Google Photos album, because Drive has an
+official API. See [deploy/README.md](deploy/README.md).
 
 ## Local development
 
@@ -65,6 +83,18 @@ npm run preview # serve the build on port 4173
 The shopping API is not available in dev. The page falls back to
 `public/data/shopping.json` and keeps local changes in the browser.
 
+### Simulate a time
+
+Add `?now=` before the hash to run the clock from another time. The clock
+advances from there in real time.
+
+```text
+http://localhost:5173/?now=2026-11-12T08:00#today
+```
+
+Use it to check the bin-day alert (Thursday), the theme switch at 06:00 and
+18:00, and the cat feed rounds.
+
 ## How a deploy works
 
 1. A push to `main` starts `.github/workflows/deploy.yml`.
@@ -80,9 +110,11 @@ The NAS pulls. Nothing on the internet connects into the home network.
 
 ## Schedule rules
 
-- Garbage pickup is every Thursday. The bins alternate each week. The pickup
-  on 2026-11-12 is black, then green, then black, and so on. Change
-  `BLACK_REFERENCE` in `src/lib/time.js` to shift the pattern.
+- Garbage pickup is every Thursday by default. The bins alternate each week.
+  The pickup on 2026-11-12 is black, then green, then black, and so on. Change
+  the reference date, the weekday, exceptions and the alert start in
+  `/data/bins.json`. On the pickup day the card pulses until someone confirms
+  the bin is outside. The confirmation is stored in `/data/state.json`.
 - Cat feeding has two rounds: 05:00 to 17:00 and 17:00 to 05:00. The question
   returns at each boundary. A fed round keeps the happy cat until the next
   boundary.

@@ -1,8 +1,5 @@
 const DAY_MS = 86400000
 
-export const PICKUP_WEEKDAY = 4 // Thursday
-export const BLACK_REFERENCE = '2026-11-12' // First black-bin pickup.
-
 export const WEEKDAYS = [
   'Sunday',
   'Monday',
@@ -83,31 +80,6 @@ export function shortHour(value) {
   const d = value instanceof Date ? value : new Date(value)
   const hour12 = d.getHours() % 12 || 12
   return `${hour12} ${d.getHours() >= 12 ? 'PM' : 'AM'}`
-}
-
-// The pickup is every Thursday. If today is Thursday, it is today.
-function nextThursday(from) {
-  const d = startOfDay(from)
-  const diff = (PICKUP_WEEKDAY - d.getDay() + 7) % 7
-  d.setDate(d.getDate() + diff)
-  return d
-}
-
-export function binFor(value) {
-  const weeks = Math.round((utc(value) - utc(BLACK_REFERENCE)) / (7 * DAY_MS))
-  return ((weeks % 2) + 2) % 2 === 0 ? 'black' : 'green'
-}
-
-export function upcomingPickups(count = 4, from = new Date()) {
-  const first = nextThursday(from)
-  const out = []
-  for (let i = 0; i < count; i += 1) {
-    const d = new Date(first)
-    d.setDate(first.getDate() + i * 7)
-    const date = ymd(d)
-    out.push({ date, bin: binFor(date) })
-  }
-  return out
 }
 
 export function relativeDay(value, now = new Date()) {

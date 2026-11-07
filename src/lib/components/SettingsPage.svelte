@@ -2,6 +2,7 @@
   import { theme, setThemeMode } from '../theme.svelte.js'
   import { build } from '../version.svelte.js'
   import { weather } from '../weather.svelte.js'
+  import { simulation } from '../clock.svelte.js'
 
   const options = [
     { id: 'light', label: 'Light' },
@@ -30,7 +31,7 @@
       {/each}
     </div>
     <p class="settings-note">
-      Auto follows the device setting and turns dark after sunset.
+      Auto uses light {theme.lightStart}–{theme.darkStart} and dark outside that window.
     </p>
   </section>
 
@@ -44,7 +45,11 @@
       <dt>Deployed</dt>
       <dd>{build.built || 'Not available'}</dd>
       <dt>Theme</dt>
-      <dd>{theme.resolved}</dd>
+      <dd>{theme.resolved} ({theme.mode})</dd>
+      {#if simulation.active}
+        <dt>Simulation</dt>
+        <dd>{simulation.start ? simulation.start.toLocaleString() : ''}</dd>
+      {/if}
     </dl>
   </section>
 </div>

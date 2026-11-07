@@ -81,10 +81,12 @@ Put the private JSON files in `~/homehq/data`. The page requests them from
 
 | File | Shape |
 | --- | --- |
-| `config.json` | `{"place":"...","latitude":52.0,"longitude":-7.0,"timezone":"Europe/Dublin","catName":"..."}` |
+| `config.json` | `{"place":"...","latitude":52.0,"longitude":-7.0,"timezone":"Europe/Dublin","catName":"...","theme":{"lightStart":"06:00","darkStart":"18:00"}}` |
 | `shopping.json` | See below |
 | `tasks.json` | `{"items":[{"text":"...","list":"Shopping","done":false}]}` |
-| `photos.json` | `{"photos":[{"src":"/data/photos/one.jpg","caption":"..."}]}` |
+| `photos.json` | Album config, see below |
+| `bins.json` | Bin schedule and alert, see below |
+| `state.json` | Bin confirmations, written by the API |
 | `controls.json` | `{"controls":[{"id":"lights","label":"Lights","url":"http://.../run","icon":"L"}]}` |
 
 Keep `config.json` out of the public repository. It holds the home location.
@@ -145,11 +147,101 @@ local backup. Changes stay on that screen until the API returns.
 
 ### Photos
 
-Put images in `~/homehq/data/photos`. A cron job every 10 minutes rebuilds
-`photos.json` from that folder. Nested folders work.
+`photos.json` is the album config, not the photo list:
 
-Keep the files small: about 1600 pixels on the long side and JPEG. The frame
-has little memory, and a wall of 8 MB photos makes the rotation slow.
+```json
+{
+  "albumUrl": "https://photos.app.goo.gl/...",
+  "refreshMinutes": 60,
+  "intervalSeconds": 20
+}
+```
+
+The `photos.py` job runs every 10 minutes. It fetches the share page when the
+refresh interval has passed, parses the image URLs, downloads them at
+1920x1080 into `photo-cache/`, removes photos that left the album, and writes
+`photos-index.json`. The page reads the index. `intervalSeconds` controls the
+slideshow.
+
+If the album cannot be read, the last cache stays. The card shows the cached
+photos with a small "Cached" tag, or a friendly message if there is no cache.
+
+#### Why not the Google Photos API
+
+Since 31 March 2025 the Library API only returns albums that the app itself
+created, and `photoslibrary.readonly` is removed. Shared-album methods return
+`403 PERMISSION_DENIED`. The Picker API needs a person to open a picker and
+select photos, which cannot run unattended.
+
+Source: https://developers.google.com/photos/support/updates
+
+The share-page importer is therefore unofficial. Google can change the page
+format. All parsing lives in `google_album.py`. If it breaks, the log shows
+`album error: no photo URLs on the share page` and the display keeps the
+cache.
+
+Limits of this approach:
+
+- Only the first batch of photos is present in the HTML. Very large albums may
+  not expose every photo without a browser.
+- Google may show a consent page in the EU. If it does, the log says so.
+- The image URLs are public while the album is shared.
+- Video items show as their still frame.
+
+#### Local folder fallback
+
+Put JPG, PNG or WebP files in `~/homehq/data/photos`. Nested folders work. The
+index uses the folder only when the album cache is empty. Keep the files small:
+about 1600 pixels on the long side.
+
+To sync a Windows folder to the NAS, use rclone:
+
+```bash
+rclone sync "C:\Users\you\Pictures\Frame" nas:/home/kas/homehq/data/photos --progress
+```
+
+Run it on a schedule with Task Scheduler. `rsync` over SSH works too.
+
+A shared Google Drive folder is more reliable than a shared Google Photos
+album, because Drive has an official API and a public folder link. It still
+needs a small importer, but the format is stable. The local folder plus rclone
+is the most reliable option.
+
+### Bin schedule and alert
+
+`bins.json` is optional. The defaults are Thursday pickup, alternating from
+12 November 2026 (black), and an alert from 00:00 on the pickup day:
+
+```json
+{
+  "weekday": 4,
+  "alertStart": "00:00",
+  "alertDayOffset": 0,
+  "referenceDate": "2026-11-12",
+  "referenceBin": "black",
+  "endDate": null,
+  "exceptions": [
+    { "date": "2026-12-24", "bin": "black", "replaces": "2026-12-25" },
+    { "date": "2027-01-01", "skip": true }
+  ]
+}
+```
+
+- `weekday`: 0 Sunday to 6 Saturday.
+- `alertStart` and `alertDayOffset`: use `-1` and `"18:00"` for an evening
+  reminder on the day before.
+- `exceptions`: a shifted pickup on any date, a different bin, or `skip`.
+  `replaces` removes the normal pickup for that date.
+- `endDate`: stop after this date.
+
+On the pickup day the card pulses until someone taps "Bin is outside". The
+confirmation goes to `state.json` through `POST /api/state`, so every screen
+agrees. A new date has no confirmation, so the alert starts fresh.
+
+```text
+GET  /api/state   -> {"bins":{"2026-11-12":{"confirmedAt":"..."}}}
+POST /api/state   -> {"bin":{"date":"2026-11-12","confirmedAt":"2026-11-12T07:42:00"}}
+```
 
 ### Tasks and controls
 

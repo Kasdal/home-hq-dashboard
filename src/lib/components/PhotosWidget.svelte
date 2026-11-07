@@ -1,90 +1,101 @@
 <script>
-  import { onMount, untrack } from 'svelte'
-  import { fetchJson } from '../http.js'
+  import { untrack } from 'svelte'
+  import { photosState, advancePhoto } from '../photos.svelte.js'
+  import { go } from '../route.svelte.js'
 
   let { full = false } = $props()
 
-  let photos = $state([])
-  let index = $state(0)
-  let state = $state('loading')
-  let broken = $state({})
+  let active = $state(0)
+  let layers = $state(['', ''])
+  let failed = $state(0)
 
-  const ROTATE_MS = 20000
-
-  function normalize(raw) {
-    const list = Array.isArray(raw) ? raw : raw && Array.isArray(raw.photos) ? raw.photos : []
-    return list
-      .map((photo) => {
-        if (typeof photo === 'string') return { src: photo, caption: '' }
-        return { src: String(photo.src || ''), caption: photo.caption ? String(photo.caption) : '' }
-      })
-      .filter((photo) => photo.src)
-  }
-
-  const usable = $derived(photos.filter((photo) => !broken[photo.src]))
-  const current = $derived(usable.length > 0 ? usable[index % usable.length] : null)
-
-  function next() {
-    if (usable.length < 2) return
-    index = (index + 1) % usable.length
-  }
-
-  function onError() {
-    if (!current) return
-    broken = { ...broken, [current.src]: true }
-    next()
-  }
+  const count = $derived(photosState.photos.length)
+  const current = $derived(photosState.photos[photosState.index] || null)
+  const number = $derived(count > 0 ? (photosState.index % count) + 1 : 0)
 
   $effect(() => {
-    const count = usable.length
-    if (count < 2) return
-    let cursor = untrack(() => index)
-    const timer = setInterval(() => {
-      cursor = (cursor + 1) % count
-      index = cursor
-    }, ROTATE_MS)
-    return () => clearInterval(timer)
+    const photo = current
+    if (!photo) return
+
+    const shownLayer = untrack(() => active)
+    const shown = untrack(() => layers)
+    if (photo.src === shown[shownLayer]) return
+
+    const back = shownLayer === 0 ? 1 : 0
+    layers = back === 0 ? [photo.src, shown[1]] : [shown[0], photo.src]
   })
 
-  async function refresh() {
-    try {
-      photos = normalize(await fetchJson('/data/photos.json', { timeout: 8000 }))
-      state = 'ok'
-    } catch {
-      state = state === 'ok' ? 'ok' : 'empty'
+  function loaded(layer) {
+    const photo = current
+    if (!photo) return
+    if (layer === active) return
+    if (layers[layer] !== photo.src) return
+    active = layer
+  }
+
+  function failedToLoad(layer) {
+    if (layers[layer] !== (current && current.src)) return
+    failed += 1
+    if (failed < photosState.photos.length) {
+      setTimeout(advancePhoto, 1200)
     }
   }
 
-  onMount(() => {
-    refresh()
-    const timer = setInterval(refresh, 10 * 60 * 1000)
-    return () => clearInterval(timer)
-  })
+  function tap() {
+    if (full) {
+      advancePhoto()
+    } else {
+      go('photos')
+    }
+  }
+
+  const emptyMessage = $derived(
+    photosState.hasAlbum
+      ? 'Album not readable. Check the link in /data/photos.json.'
+      : 'Add an album link in /data/photos.json'
+  )
 </script>
 
 <section class="panel" class:photo-panel-full={full}>
   <header class="panel-head">
     <h2>Photos</h2>
-    {#if usable.length > 1}
-      <span class="panel-sub">{index % usable.length + 1} / {usable.length}</span>
+    {#if photosState.error && photosState.source === 'album'}
+      <span class="panel-sub">Cached</span>
+    {:else if count > 1}
+      <span class="panel-sub">{number} / {count}{full ? ' · tap to advance' : ''}</span>
     {/if}
   </header>
 
   {#if current}
-    <div class="photo-wrap">
-      {#key current.src}
-        <img class="photo" src={current.src} alt={current.caption} onerror={onError} />
-      {/key}
+    <button class="photo-wrap photo-hit" type="button" onclick={tap} aria-label={full ? 'Next photo' : 'Open photos'}>
+      <img
+        class="photo-layer"
+        class:active={active === 0}
+        src={layers[0] || undefined}
+        alt={current.caption}
+        draggable="false"
+        onload={() => loaded(0)}
+        onerror={() => failedToLoad(0)}
+      />
+      <img
+        class="photo-layer"
+        class:active={active === 1}
+        src={layers[1] || undefined}
+        alt=""
+        draggable="false"
+        onload={() => loaded(1)}
+        onerror={() => failedToLoad(1)}
+      />
       {#if current.caption}
-        <div class="photo-caption">{current.caption}</div>
+        <span class="photo-caption">{current.caption}</span>
       {/if}
-    </div>
-  {:else if state === 'loading'}
+    </button>
+  {:else if !photosState.loaded}
     <div class="empty"><span class="empty-title">Loading photos</span></div>
   {:else}
     <div class="empty">
       <span class="empty-title">No photos</span>
-      <span class="empty-hint">Add images to <code>~/homehq/data/photos</code>.</span>
+      <span class="empty-hint">{emptyMessage}</span>
     </div>
   {/if}
 </section>
