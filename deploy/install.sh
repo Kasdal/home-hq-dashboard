@@ -15,6 +15,10 @@ mkdir -p "${BASE}/releases/bootstrap" "${BASE}/data"
 
 install -m 644 "${HERE}/nginx.conf" "${BASE}/nginx.conf"
 install -m 755 "${HERE}/pull.sh" "${BASE}/pull.sh"
+install -m 755 "${HERE}/fetch-calendar.py" "${BASE}/fetch-calendar.py"
+install -m 755 "${HERE}/photos.py" "${BASE}/photos.py"
+
+mkdir -p "${BASE}/data/photos"
 
 if [ ! -f "${BASE}/releases/bootstrap/index.html" ]; then
     cat > "${BASE}/releases/bootstrap/index.html" <<'HTML'
@@ -64,12 +68,23 @@ docker run -d \
     -v "${BASE}/data:/sitedata:ro" \
     nginx:alpine
 
-# Install the pull timer if it is not present.
-CRON_LINE="*/5 * * * * ${BASE}/pull.sh >> ${BASE}/pull.log 2>&1"
-if ! crontab -l 2>/dev/null | grep -F "${BASE}/pull.sh" >/dev/null; then
-    { crontab -l 2>/dev/null || true; echo "${CRON_LINE}"; } | crontab -
-    echo "Cron entry added."
-fi
+# Install the timers if they are not present.
+add_cron() {
+    local line="$1"
+    local needle="$2"
+    if ! crontab -l 2>/dev/null | grep -F "${needle}" >/dev/null; then
+        { crontab -l 2>/dev/null || true; echo "${line}"; } | crontab -
+        echo "Cron entry added: ${needle}"
+    fi
+}
+
+add_cron "*/5 * * * * ${BASE}/pull.sh >> ${BASE}/pull.log 2>&1" "${BASE}/pull.sh"
+add_cron "*/15 * * * * python3 ${BASE}/fetch-calendar.py >> ${BASE}/calendar.log 2>&1" "${BASE}/fetch-calendar.py"
+add_cron "*/10 * * * * python3 ${BASE}/photos.py >> ${BASE}/photos.log 2>&1" "${BASE}/photos.py"
+
+# Write the data files once, so a new install is not empty on the page.
+python3 "${BASE}/photos.py" || true
+python3 "${BASE}/fetch-calendar.py" || true
 
 if [ -d "${BASE}/repo/.git" ]; then
     "${BASE}/pull.sh"

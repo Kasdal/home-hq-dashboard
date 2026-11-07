@@ -77,6 +77,35 @@ Keep `config.json` out of the public repository. It holds the home location.
 `controls.json` entries must accept `POST`. The frame sends a bodyless POST and
 treats any 2xx or 3xx answer as success.
 
+### Calendar feed
+
+The installer copies `fetch-calendar.py` and adds a cron job every 15 minutes.
+Put the private iCalendar URL in one file:
+
+```bash
+printf '%s\n' 'https://.../private-ics-link' > ~/homehq/data/calendar.url
+chmod 600 ~/homehq/data/calendar.url
+python3 ~/homehq/fetch-calendar.py
+```
+
+The script downloads the feed to `~/homehq/data/calendar.ics`, expands weekly
+and monthly rules, applies `EXDATE` and moved events, and writes
+`calendar.json`. If the download fails, it keeps the last good file. The URL
+never reaches the page or the repository.
+
+### Photos
+
+Put images in `~/homehq/data/photos`. The installer adds a cron job every 10
+minutes that rebuilds `photos.json` from that folder. Nested folders work.
+
+Keep the files small: about 1600 pixels on the long side and JPEG. The frame
+has little memory, and a wall of 8 MB photos makes the rotation slow.
+
+### Tasks and controls
+
+These files have no generator. Write them from another system, or edit them by
+hand. Both are read every couple of minutes.
+
 ## Rollback
 
 ```bash
