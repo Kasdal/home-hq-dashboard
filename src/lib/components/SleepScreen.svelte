@@ -2,12 +2,17 @@
   import { untrack } from 'svelte'
   import { photosState, advancePhoto } from '../photos.svelte.js'
   import { wake } from '../idle.svelte.js'
+  import { clock } from '../clock.svelte.js'
+  import { clockParts } from '../time.js'
+  import { weather } from '../weather.svelte.js'
 
   let active = $state(0)
   let layers = $state(['', ''])
   let failed = $state(0)
 
   const current = $derived(photosState.photos[photosState.index] || null)
+  const parts = $derived(clockParts(clock.now))
+  const temp = $derived(weather.current ? Math.round(weather.current.temperature_2m) : null)
 
   $effect(() => {
     const photo = current
@@ -66,4 +71,11 @@
       onerror={() => failedToLoad(1)}
     />
   {/if}
+
+  <div class="sleep-info" aria-hidden="true">
+    <div class="sleep-time">{parts.time}<span class="sleep-suffix">{parts.suffix}</span></div>
+    {#if temp !== null}
+      <div class="sleep-temp">{temp}<span class="sleep-deg">°</span></div>
+    {/if}
+  </div>
 </button>

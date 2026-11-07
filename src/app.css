@@ -1101,6 +1101,60 @@ p {
   opacity: 1;
 }
 
+.sleep-info {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(30px, 4vw, 70px);
+  pointer-events: none;
+}
+
+.sleep-info::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.4),
+    rgba(0, 0, 0, 0) 24%,
+    rgba(0, 0, 0, 0) 76%,
+    rgba(0, 0, 0, 0.4)
+  );
+}
+
+.sleep-time,
+.sleep-temp {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-size: clamp(72px, 13vh, 150px);
+  line-height: 1;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 26px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.sleep-suffix {
+  font-size: 0.2em;
+  letter-spacing: 0.08em;
+  margin-left: 0.12em;
+  vertical-align: super;
+}
+
+.sleep-deg {
+  font-size: 0.7em;
+  vertical-align: 0.34em;
+}
+
 /* ---------- controls widget ---------- */
 
 .controls-panel {
