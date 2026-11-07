@@ -10,6 +10,7 @@ import { startControls } from './lib/controls.svelte.js'
 import { startBins, bins } from './lib/bins.svelte.js'
 import { startPhotos } from './lib/photos.svelte.js'
 import { loadConfig } from './lib/config.js'
+import { startIdleWatch, idle, idleDebug } from './lib/idle.svelte.js'
 import { startVersionWatch } from './lib/version.svelte.js'
 
 initTheme()
@@ -21,7 +22,10 @@ startBins()
 startPhotos()
 startVersionWatch()
 
-loadConfig().then((config) => setThemeSchedule(config.theme))
+loadConfig().then((config) => {
+  setThemeSchedule(config.theme)
+  startIdleWatch(config.sleepAfterMinutes)
+})
 
 const app = mount(App, { target: document.getElementById('app') })
 
@@ -30,6 +34,8 @@ if (typeof window !== 'undefined') {
   window.__hqClock = clock
   window.__hqTheme = theme
   window.__hqBins = bins
+  window.__hqIdle = idle
+  window.__hqIdleDebug = idleDebug
   window.__hqDebug = () => ({
     weekday: bins.schedule.weekday,
     alertStart: bins.schedule.alertStart,

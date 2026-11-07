@@ -8,6 +8,7 @@ export const DEFAULTS = {
   longitude: null,
   timezone: 'auto',
   catName: 'Smrdljivi',
+  sleepAfterMinutes: 2,
   cat: {
     hungry: 'https://media.tenor.com/0rPjitCLTt8AAAAM/cute-kitten.gif',
     fed: 'https://i.pinimg.com/736x/88/d2/e3/88d2e3118b3ce0bf527f9ed492f91698.jpg',

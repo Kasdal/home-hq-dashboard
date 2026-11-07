@@ -6,6 +6,8 @@
   import ControlsPage from './lib/components/ControlsPage.svelte'
   import SettingsPage from './lib/components/SettingsPage.svelte'
   import { route } from './lib/route.svelte.js'
+  import { idle } from './lib/idle.svelte.js'
+  import SleepScreen from './lib/components/SleepScreen.svelte'
 </script>
 
 <div class="app">
@@ -23,4 +25,8 @@
       <TodayPage />
     {/if}
   </div>
+
+  {#if idle.active}
+    <SleepScreen />
+  {/if}
 </div>

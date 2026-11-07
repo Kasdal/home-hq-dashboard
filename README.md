@@ -63,6 +63,15 @@ Fallback: put JPG, PNG or WebP files in `~/homehq/data/photos`. A shared Google
 Drive folder is more reliable than a Google Photos album, because Drive has an
 official API. See [deploy/README.md](deploy/README.md).
 
+## Sleep screen
+
+After two minutes without a tap or key, the dashboard becomes a full-screen
+photo slideshow. Photos crossfade and fit the screen, with no zoom or crop. A
+tap or key returns to the dashboard.
+
+Set `sleepAfterMinutes` in `/data/config.json` to change the delay. Use `0` to
+turn the sleep screen off. With no photos loaded, the dashboard stays awake.
+
 ## Local development
 
 ```bash
@@ -94,6 +103,15 @@ http://localhost:5173/?now=2026-11-12T08:00#today
 
 Use it to check the bin-day alert (Thursday), the theme switch at 06:00 and
 18:00, and the cat feed rounds.
+
+### Simulate the sleep screen
+
+Add `?sleep=` before the hash with a number of seconds. The sleep screen starts
+after that delay.
+
+```text
+http://localhost:5173/?sleep=5#today
+```
 
 ## How a deploy works
 
