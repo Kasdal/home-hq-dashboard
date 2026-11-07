@@ -1,0 +1,37 @@
+{
+  "rev": 1,
+  "stores": [
+    { "id": "tesco", "name": "Tesco" },
+    { "id": "lidl", "name": "Lidl" }
+  ],
+  "items": [
+    { "id": "bananas", "name": "Bananas", "note": "Bunch, not too ripe", "qty": 1, "category": "Produce", "store": "any", "done": false },
+    { "id": "milk", "name": "Milk", "note": "", "qty": 2, "category": "Dairy & Eggs", "store": "any", "done": false },
+    { "id": "eggs", "name": "Eggs", "note": "Free range", "qty": 1, "category": "Dairy & Eggs", "store": "any", "done": false },
+    { "id": "brennans", "name": "Brennan's white bread", "note": "", "qty": 1, "category": "Bakery", "store": "any", "done": false },
+    { "id": "bagels", "name": "Bagels", "note": "", "qty": 2, "category": "Bakery", "store": "lidl", "done": false },
+    { "id": "butter", "name": "Kerrygold butter", "note": "", "qty": 1, "category": "Dairy & Eggs", "store": "any", "done": false },
+    { "id": "chicken", "name": "Chicken fillets", "note": "Family pack", "qty": 1, "category": "Meat & Fish", "store": "tesco", "done": false },
+    { "id": "rashers", "name": "Rashers", "note": "", "qty": 1, "category": "Meat & Fish", "store": "any", "done": false },
+    { "id": "tea", "name": "Barry's tea", "note": "", "qty": 1, "category": "Pantry", "store": "any", "done": false },
+    { "id": "pasta", "name": "Pasta", "note": "", "qty": 2, "category": "Pantry", "store": "any", "done": false },
+    { "id": "tomatoes", "name": "Chopped tomatoes", "note": "Tinned", "qty": 3, "category": "Pantry", "store": "any", "done": false },
+    { "id": "peas", "name": "Frozen peas", "note": "", "qty": 1, "category": "Frozen", "store": "any", "done": false },
+    { "id": "washing-up", "name": "Washing up liquid", "note": "", "qty": 1, "category": "Household", "store": "any", "done": false },
+    { "id": "apples", "name": "Apples", "note": "", "qty": 1, "category": "Produce", "store": "any", "done": false },
+    { "id": "spuds", "name": "Spuds 2 kg", "note": "", "qty": 1, "category": "Produce", "store": "any", "done": false },
+    { "id": "yogurt", "name": "Yogurt", "note": "", "qty": 1, "category": "Dairy & Eggs", "store": "lidl", "done": false },
+    { "id": "orange-juice", "name": "Orange juice", "note": "", "qty": 1, "category": "Drinks", "store": "any", "done": false }
+  ],
+  "usuals": [
+    { "name": "Milk", "category": "Dairy & Eggs" },
+    { "name": "Eggs", "category": "Dairy & Eggs" },
+    { "name": "Bread", "category": "Bakery" },
+    { "name": "Bananas", "category": "Produce" },
+    { "name": "Butter", "category": "Dairy & Eggs" },
+    { "name": "Tea", "category": "Pantry" },
+    { "name": "Chicken", "category": "Meat & Fish" },
+    { "name": "Pasta", "category": "Pantry" },
+    { "name": "Spuds", "category": "Produce" }
+  ]
+}

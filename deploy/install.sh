@@ -1,24 +1,36 @@
 #!/bin/bash
 # One-time setup on the NAS. No sudo is needed when the user can use docker
-# and crontab. Safe to run again after changes to nginx.conf or pull.sh.
+# and crontab. Safe to run again after changes to the deploy files.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BASE="${HOME}/homehq"
 PORT="${PORT:-8088}"
 CONTAINER="homehq-web"
+API="homehq-api"
+NETWORK="homehq"
 REPO_URL="https://github.com/Kasdal/home-hq-dashboard.git"
 
 echo "Base directory: ${BASE}"
 
-mkdir -p "${BASE}/releases/bootstrap" "${BASE}/data"
+mkdir -p "${BASE}/releases/bootstrap" "${BASE}/data/photos"
 
 install -m 644 "${HERE}/nginx.conf" "${BASE}/nginx.conf"
 install -m 755 "${HERE}/pull.sh" "${BASE}/pull.sh"
-install -m 755 "${HERE}/fetch-calendar.py" "${BASE}/fetch-calendar.py"
 install -m 755 "${HERE}/photos.py" "${BASE}/photos.py"
+install -m 755 "${HERE}/api.py" "${BASE}/api.py"
 
-mkdir -p "${BASE}/data/photos"
+# Remove the retired calendar job and script.
+if crontab -l 2>/dev/null | grep -F "fetch-calendar.py" >/dev/null; then
+    crontab -l 2>/dev/null | grep -v -F "fetch-calendar.py" | crontab - || true
+    echo "Removed the old calendar cron job."
+fi
+rm -f "${BASE}/fetch-calendar.py"
+
+if [ ! -f "${BASE}/data/shopping.json" ]; then
+    install -m 644 "${HERE}/sample-shopping.json" "${BASE}/data/shopping.json"
+    echo "Installed the sample shopping list."
+fi
 
 if [ ! -f "${BASE}/releases/bootstrap/index.html" ]; then
     cat > "${BASE}/releases/bootstrap/index.html" <<'HTML'
@@ -30,8 +42,8 @@ if [ ! -f "${BASE}/releases/bootstrap/index.html" ]; then
     <title>Home HQ</title>
     <style>
       body { margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
-             background: #0d1218; color: #93a3b3; font-family: system-ui, sans-serif; text-align: center; }
-      strong { display: block; color: #e8eef4; font-size: 28px; margin-bottom: 10px; }
+             background: #f2eee6; color: #7c7568; font-family: system-ui, sans-serif; text-align: center; }
+      strong { display: block; color: #111; font-size: 28px; margin-bottom: 10px; }
     </style>
   </head>
   <body>
@@ -57,11 +69,26 @@ if [ ! -d "${BASE}/repo/.git" ]; then
     fi
 fi
 
+docker network inspect "${NETWORK}" >/dev/null 2>&1 || docker network create "${NETWORK}"
+
+# Shopping list API. Runs as the owner of the data folder and has no open port.
+docker rm -f "${API}" >/dev/null 2>&1 || true
+docker run -d \
+    --name "${API}" \
+    --restart unless-stopped \
+    --network "${NETWORK}" \
+    --user "$(id -u):$(id -g)" \
+    -e DATA_DIR=/data \
+    -v "${BASE}/api.py:/api/api.py:ro" \
+    -v "${BASE}/data:/data" \
+    python:3-alpine python3 /api/api.py
+
 # Start or replace the web container.
 docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
 docker run -d \
     --name "${CONTAINER}" \
     --restart unless-stopped \
+    --network "${NETWORK}" \
     -p "${PORT}:80" \
     -v "${BASE}:/site:ro" \
     -v "${BASE}/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
@@ -79,17 +106,16 @@ add_cron() {
 }
 
 add_cron "*/5 * * * * ${BASE}/pull.sh >> ${BASE}/pull.log 2>&1" "${BASE}/pull.sh"
-add_cron "*/15 * * * * python3 ${BASE}/fetch-calendar.py >> ${BASE}/calendar.log 2>&1" "${BASE}/fetch-calendar.py"
 add_cron "*/10 * * * * python3 ${BASE}/photos.py >> ${BASE}/photos.log 2>&1" "${BASE}/photos.py"
 
-# Write the data files once, so a new install is not empty on the page.
 python3 "${BASE}/photos.py" || true
-python3 "${BASE}/fetch-calendar.py" || true
 
 if [ -d "${BASE}/repo/.git" ]; then
     "${BASE}/pull.sh"
 fi
 
-sleep 1
+sleep 2
 docker ps --filter "name=${CONTAINER}"
+docker ps --filter "name=${API}"
 curl -sS -o /dev/null -w "HTTP %{http_code} on port ${PORT}\n" "http://127.0.0.1:${PORT}/"
+curl -sS -o /dev/null -w "API %{http_code}\n" "http://127.0.0.1:${PORT}/api/health"

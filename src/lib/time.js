@@ -67,6 +67,24 @@ export function formatTime(value) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+export function clockParts(value = new Date()) {
+  const hours = value.getHours()
+  const hour12 = hours % 12 || 12
+  return {
+    time: `${hour12}:${pad(value.getMinutes())}`,
+    suffix: hours >= 12 ? 'PM' : 'AM',
+    weekday: WEEKDAYS[value.getDay()],
+    month: MONTHS[value.getMonth()],
+    day: value.getDate(),
+  }
+}
+
+export function shortHour(value) {
+  const d = value instanceof Date ? value : new Date(value)
+  const hour12 = d.getHours() % 12 || 12
+  return `${hour12} ${d.getHours() >= 12 ? 'PM' : 'AM'}`
+}
+
 // The pickup is every Thursday. If today is Thursday, it is today.
 function nextThursday(from) {
   const d = startOfDay(from)

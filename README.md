@@ -4,25 +4,46 @@ A family dashboard for a wall-mounted photo frame. Static site, small bundle,
 no framework server.
 
 - **Stack:** Vite 8, Svelte 5, plain CSS.
-- **Target:** 1280x800 landscape, Android 6, WebView 106.
-- **Host:** a small nginx container on the home NAS.
+- **Target:** 1280x800 landscape, Android 6, WebView 106. Also fills 1920x1080.
+- **Host:** a small nginx container and a tiny shopping API on the home NAS.
 - **Build:** GitHub Actions on each push to `main`.
 
-## What it shows
+## Pages
+
+| Page | Contents |
+| --- | --- |
+| Today | Big clock and weather, garbage, shopping, tasks, photos, cat feeding, controls |
+| Shopping | Full shared list with store filter, quantities and usuals |
+| Photos | Full-screen slideshow |
+| Controls | Large tiles for home actions |
+| Settings | Light / Auto / Dark theme and build information |
+
+The navigation rail uses hash routes: `#today`, `#shopping`, `#photos`,
+`#controls`, `#settings`.
+
+## Today widgets
 
 | Widget | Source |
 | --- | --- |
-| Clock and date | Device clock |
-| Weather | Open-Meteo, no API key |
+| Clock and weather | Device clock, Open-Meteo (no API key), hourly strip |
 | Garbage bins | Built-in Thursday schedule, alternating black and green |
-| Cat feeding | Two rounds per day, stored in the browser |
-| Calendar | `/data/calendar.json` |
+| Shopping | `/data/shopping.json` through `/api/shopping` |
 | Tasks | `/data/tasks.json` |
 | Photos | `/data/photos.json` |
+| Cat feeding | Two rounds per day, stored in the browser |
 | Home controls | `/data/controls.json` |
 
 Private data comes from the NAS at runtime. The repository stays public and
 holds no secrets, home address or location.
+
+## Theme
+
+Light is the default from `prefers-color-scheme`. The Settings page offers
+Light, Auto and Dark. Auto follows the device and turns dark after sunset,
+using the sunset time from the forecast. The choice is stored in the browser.
+
+Fonts are served from the NAS: Anton and Playfair Display, both under the SIL
+Open Font License. See `public/fonts/OFL.txt`.
 
 ## Local development
 
@@ -32,14 +53,17 @@ npm run dev
 ```
 
 Open the printed address at 1280x800. To see widgets with data, create
-`public/data/` and copy the JSON shapes from [deploy/README.md](deploy/README.md).
-That folder is ignored by git.
+`public/data/` and copy `deploy/sample-shopping.json` to
+`public/data/shopping.json`. That folder is ignored by git.
 
 ```bash
 npm run check   # bin parity and cat feed cycle tests
 npm run build   # production build in dist/
 npm run preview # serve the build on port 4173
 ```
+
+The shopping API is not available in dev. The page falls back to
+`public/data/shopping.json` and keeps local changes in the browser.
 
 ## How a deploy works
 

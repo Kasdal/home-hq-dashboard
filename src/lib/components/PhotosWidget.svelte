@@ -2,6 +2,8 @@
   import { onMount, untrack } from 'svelte'
   import { fetchJson } from '../http.js'
 
+  let { full = false } = $props()
+
   let photos = $state([])
   let index = $state(0)
   let state = $state('loading')
@@ -60,7 +62,7 @@
   })
 </script>
 
-<section class="panel">
+<section class="panel" class:photo-panel-full={full}>
   <header class="panel-head">
     <h2>Photos</h2>
     {#if usable.length > 1}
@@ -71,12 +73,7 @@
   {#if current}
     <div class="photo-wrap">
       {#key current.src}
-        <img
-          class="photo"
-          src={current.src}
-          alt={current.caption}
-          onerror={onError}
-        />
+        <img class="photo" src={current.src} alt={current.caption} onerror={onError} />
       {/key}
       {#if current.caption}
         <div class="photo-caption">{current.caption}</div>
@@ -87,7 +84,7 @@
   {:else}
     <div class="empty">
       <span class="empty-title">No photos</span>
-      <span class="empty-hint">Add <code>/data/photos.json</code> on the NAS.</span>
+      <span class="empty-hint">Add images to <code>~/homehq/data/photos</code>.</span>
     </div>
   {/if}
 </section>

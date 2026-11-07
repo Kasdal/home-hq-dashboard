@@ -13,15 +13,25 @@ token.
     <sha>/           one built site per release
     bootstrap/       placeholder page
   current -> releases/<sha>
-  data/              private JSON files, mounted at /sitedata
+  data/              private JSON files, mounted at /sitedata and /data
+  photos/            image files for the slideshow (in data/photos)
   nginx.conf
   pull.sh
+  photos.py
+  api.py
   pull.log
 ```
 
-`~/homehq/data` is mounted read-only into the container at `/sitedata` and
-served as `/data/`. A deploy swaps the `current` symlink, so data files stay in
-place.
+Two containers run from a private Docker network named `homehq`:
+
+- `homehq-web`: `nginx:alpine`, published on port `8088`. It serves the site
+  and proxies `/api/` to the API container.
+- `homehq-api`: `python:3-alpine`, no published port. It reads and writes
+  `data/shopping.json` for the shopping page.
+
+`~/homehq/data` is mounted read-only in the web container at `/sitedata` and
+read-write in the API container at `/data`. A deploy swaps the `current`
+symlink, so data files stay in place.
 
 ## First setup
 
@@ -32,15 +42,19 @@ place.
 bash ~/homehq-setup/install.sh
 ```
 
-The installer does four things:
+The installer does these things:
 
-- Creates the directories and the placeholder page.
+- Creates the directories, the placeholder page and a sample shopping list.
+- Creates the `homehq` Docker network.
+- Starts the API container.
 - Starts `nginx:alpine` as `homehq-web` on port `8088`.
-- Adds a crontab entry that runs `pull.sh` every 5 minutes.
+- Adds a crontab entry that runs `pull.sh` every 5 minutes and `photos.py`
+  every 10 minutes.
 - Pulls the first release if `gh-pages` exists.
 
-Run it again after a change to `nginx.conf` or `pull.sh`. The container is
-replaced, and the cron entry is not duplicated.
+Run it again after a change to `nginx.conf`, `pull.sh`, `api.py` or
+`photos.py`. The containers are replaced, and the cron entries are not
+duplicated.
 
 ## Port
 
@@ -53,21 +67,22 @@ PORT=8090 bash ~/homehq-setup/install.sh
 ## Check
 
 ```bash
-docker ps --filter name=homehq-web
+docker ps --filter name=homehq
 curl -I http://127.0.0.1:8088/
 curl http://127.0.0.1:8088/version.json
+curl http://127.0.0.1:8088/api/shopping
 tail -f ~/homehq/pull.log
 ```
 
 ## Data files
 
 Put the private JSON files in `~/homehq/data`. The page requests them from
-`/data/`. All are optional. A missing file shows the empty state.
+`/data/`. All are optional. A missing file shows an empty state.
 
 | File | Shape |
 | --- | --- |
-| `config.json` | `{"place":"...","latitude":46.0,"longitude":14.5,"timezone":"auto","catName":"..."}` |
-| `calendar.json` | `{"events":[{"title":"...","start":"2026-11-12T08:30:00","end":"...","allDay":false}]}` |
+| `config.json` | `{"place":"...","latitude":52.0,"longitude":-7.0,"timezone":"Europe/Dublin","catName":"..."}` |
+| `shopping.json` | See below |
 | `tasks.json` | `{"items":[{"text":"...","list":"Shopping","done":false}]}` |
 | `photos.json` | `{"photos":[{"src":"/data/photos/one.jpg","caption":"..."}]}` |
 | `controls.json` | `{"controls":[{"id":"lights","label":"Lights","url":"http://.../run","icon":"L"}]}` |
@@ -77,26 +92,61 @@ Keep `config.json` out of the public repository. It holds the home location.
 `controls.json` entries must accept `POST`. The frame sends a bodyless POST and
 treats any 2xx or 3xx answer as success.
 
-### Calendar feed
+### Shopping list
 
-The installer copies `fetch-calendar.py` and adds a cron job every 15 minutes.
-Put the private iCalendar URL in one file:
+The installer writes a sample list on the first run. The API reads and writes
+the same file:
 
-```bash
-printf '%s\n' 'https://.../private-ics-link' > ~/homehq/data/calendar.url
-chmod 600 ~/homehq/data/calendar.url
-python3 ~/homehq/fetch-calendar.py
+```text
+GET  /api/shopping   -> the list
+POST /api/shopping   -> replace the list
 ```
 
-The script downloads the feed to `~/homehq/data/calendar.ics`, expands weekly
-and monthly rules, applies `EXDATE` and moved events, and writes
-`calendar.json`. If the download fails, it keeps the last good file. The URL
-never reaches the page or the repository.
+The write uses a temporary file and `os.replace`, so a reader never sees a
+half-written list. The API runs as the owner of `~/homehq/data` and is not
+published to the network. Only nginx can reach it.
+
+Schema:
+
+```json
+{
+  "rev": 1,
+  "stores": [
+    { "id": "tesco", "name": "Tesco" },
+    { "id": "lidl", "name": "Lidl" }
+  ],
+  "items": [
+    {
+      "id": "bananas",
+      "name": "Bananas",
+      "note": "Bunch, not too ripe",
+      "qty": 1,
+      "category": "Produce",
+      "store": "any",
+      "done": false
+    }
+  ],
+  "usuals": [
+    { "name": "Milk", "category": "Dairy & Eggs" }
+  ]
+}
+```
+
+`store` is `any`, `tesco` or `lidl`. An `any` item counts towards every store.
+`category` is one of Produce, Bakery, Dairy & Eggs, Meat & Fish, Pantry,
+Frozen, Drinks, Household, Other.
+
+The page polls every 30 seconds. It pauses polling for 5 seconds after a local
+change and while a text field has focus, so a phone edit does not overwrite an
+edit in progress.
+
+If the API is down, the page keeps working from `/data/shopping.json` and a
+local backup. Changes stay on that screen until the API returns.
 
 ### Photos
 
-Put images in `~/homehq/data/photos`. The installer adds a cron job every 10
-minutes that rebuilds `photos.json` from that folder. Nested folders work.
+Put images in `~/homehq/data/photos`. A cron job every 10 minutes rebuilds
+`photos.json` from that folder. Nested folders work.
 
 Keep the files small: about 1600 pixels on the long side and JPEG. The frame
 has little memory, and a wall of 8 MB photos makes the rotation slow.
@@ -117,7 +167,12 @@ mv -Tf ~/homehq/current.new ~/homehq/current
 ## Stop
 
 ```bash
-docker stop homehq-web
-docker rm homehq-web
-crontab -e   # remove the pull.sh line
+docker stop homehq-web homehq-api
+docker rm homehq-web homehq-api
+crontab -e   # remove the pull.sh and photos.py lines
 ```
+
+## Network access
+
+`nginx.conf` allows private address ranges only and denies every other client.
+The API has no published port. Do not forward port `8088` on the router.
