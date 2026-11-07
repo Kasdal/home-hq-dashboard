@@ -24,15 +24,17 @@ USER_AGENT = (
 PHOTO_HOST = "lh3.googleusercontent.com"
 MAX_PAGE_BYTES = 12 * 1024 * 1024
 
-# Photo entries start with an AF1Qip media key, then an array whose first item
-# is the full image URL. This skips owner avatars, which also use the same host.
+# Photo entries used the shape ["AF1Qip...", ["https://lh3..."]]. Keep this for
+# older pages and for the precise media-key match.
 ENTRY_PATTERN = re.compile(
     r'\[\s*"AF1Qip[^"]{10,}"\s*,\s*\[\s*"(https://lh[0-9]\.googleusercontent\.com/[A-Za-z0-9_\-]{16,})"'
 )
 
-# Fallback for a page format change: any lh3 image URL. Avatars use /a/<id>.
+# Current pages (2025+) use /pw/<token> image paths, and the page is a JS app.
+# After unescaping, match both /pw/<token> and the older /<token> form.
+# Avatars (/a/) and the default user icon (/ogw/) do not match.
 URL_PATTERN = re.compile(
-    r"https:(?:\\/\\/|//)lh[0-9]\.googleusercontent\.com(?:\\/|/)([A-Za-z0-9_\-]{16,})"
+    r"https://lh[0-9]\.googleusercontent\.com/((?:pw/)?[A-Za-z0-9_\-]{16,})"
 )
 
 TITLE_PATTERN = re.compile(r"<title>(.*?)</title>", re.DOTALL | re.IGNORECASE)
@@ -61,13 +63,16 @@ def parse_album_html(body):
     if urls:
         return urls
 
-    # Fallback. A rare owner avatar can slip in, which is better than no photos.
+    # Fallback for the current page format. It can include an owner avatar.
     for match in URL_PATTERN.finditer(text):
-        image_id = match.group(1)
-        if image_id in seen:
+        path = match.group(1)
+        if path.startswith(("a/", "ogw/")):
             continue
-        seen.add(image_id)
-        urls.append("https://%s/%s" % (PHOTO_HOST, image_id))
+        url = "https://%s/%s" % (PHOTO_HOST, path)
+        if url in seen:
+            continue
+        seen.add(url)
+        urls.append(url)
 
     return urls
 
