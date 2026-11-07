@@ -8,7 +8,7 @@
   const filtered = $derived(
     open.filter((item) => filter === 'all' || item.store === 'any' || item.store === filter)
   )
-  const visible = $derived(filtered.slice(0, 4))
+  const visible = $derived(filtered.slice(0, 5))
   const more = $derived(Math.max(0, filtered.length - visible.length))
 
   function storeName(id) {
