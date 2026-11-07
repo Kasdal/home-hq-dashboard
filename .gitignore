@@ -16,3 +16,7 @@ Thumbs.db
 
 # Temporary local screenshots
 public/_tmp/
+
+# Python
+__pycache__/
+*.pyc
