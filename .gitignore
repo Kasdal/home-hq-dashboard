@@ -13,3 +13,6 @@ public/data/
 # OS files
 Thumbs.db
 .DS_Store
+
+# Temporary local screenshots
+public/_tmp/
