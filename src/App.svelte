@@ -2,6 +2,7 @@
   import NavRail from './lib/components/NavRail.svelte'
   import TodayPage from './lib/components/TodayPage.svelte'
   import ShoppingPage from './lib/components/ShoppingPage.svelte'
+  import CookingPage from './lib/components/CookingPage.svelte'
   import PhotosPage from './lib/components/PhotosPage.svelte'
   import ControlsPage from './lib/components/ControlsPage.svelte'
   import SettingsPage from './lib/components/SettingsPage.svelte'
@@ -15,6 +16,8 @@
   <div class="stage">
     {#if route.page === 'shopping'}
       <ShoppingPage />
+    {:else if route.page === 'cooking'}
+      <CookingPage />
     {:else if route.page === 'photos'}
       <PhotosPage />
     {:else if route.page === 'controls'}

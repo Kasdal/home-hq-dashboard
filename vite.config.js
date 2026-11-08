@@ -8,4 +8,15 @@ export default defineConfig({
   build: {
     target: 'chrome106',
   },
+  server: {
+    // The local API is optional. Start it on port 8099 to test edits and
+    // uploads in dev. The page falls back to public/data when it is absent.
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8099',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
 })

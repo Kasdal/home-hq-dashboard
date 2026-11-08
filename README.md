@@ -5,7 +5,7 @@ no framework server.
 
 - **Stack:** Vite 8, Svelte 5, plain CSS.
 - **Target:** 1280x800 landscape, Android 6, WebView 106. Also fills 1920x1080.
-- **Host:** a small nginx container and a tiny shopping API on the home NAS.
+- **Host:** a small nginx container and a tiny data API on the home NAS.
 - **Build:** GitHub Actions on each push to `main`.
 
 <img width="2575" height="1159" alt="Image" src="https://github.com/user-attachments/assets/39b48bf4-91d2-48a9-8b77-4820a4995667" />
@@ -16,12 +16,13 @@ no framework server.
 | --- | --- |
 | Today | Big clock and weather, garbage, shopping, tasks, photos, cat feeding, controls |
 | Shopping | Full shared list with store filter, quantities and usuals |
+| Cooking | Recipe grid, live search, full-screen recipe view, drag-and-drop add |
 | Photos | Full-screen slideshow |
 | Controls | Large tiles for home actions |
 | Settings | Light / Auto / Dark theme and build information |
 
-The navigation rail uses hash routes: `#today`, `#shopping`, `#photos`,
-`#controls`, `#settings`.
+The navigation rail uses hash routes: `#today`, `#shopping`, `#cooking`,
+`#photos`, `#controls`, `#settings`.
 
 ## Today widgets
 
@@ -68,6 +69,23 @@ slideshow. You can also copy files into that folder directly. A shared Google
 Drive folder is more reliable than a Google Photos album, because Drive has an
 official API. See [deploy/README.md](deploy/README.md).
 
+## Cooking
+
+The Cooking page keeps recipes in `/data/recipes.json`. Drop images, PDFs, TXT
+or MD files on the page, or use "+ Add recipe". One file makes one recipe. The
+limit is 20 MB per file. The page shows a card grid and a live search over
+titles, tags, notes and extracted text.
+
+A background worker on the NAS reads text from images and PDFs with Tesseract
+and Poppler. TXT and MD files are read directly. Text is capped at 20,000
+characters. The API image needs about 100 MB extra for the tools. Edit the
+title, tags and notes in the recipe view. Delete removes the entry, file and
+thumbnail.
+
+The recipe file lives in `~/homehq/data/recipes/files`. The page works on the
+frame and on a PC. Android WebView cannot show PDFs, so the frame shows the
+extracted text instead.
+
 ## Sleep screen
 
 After two minutes without a tap or key, the dashboard becomes a full-screen
@@ -95,8 +113,17 @@ npm run build   # production build in dist/
 npm run preview # serve the build on port 4173
 ```
 
-The shopping API is not available in dev. The page falls back to
-`public/data/shopping.json` and keeps local changes in the browser.
+The API is optional in dev. Start it on port 8099 to test shopping, recipes and
+uploads:
+
+```powershell
+$env:DATA_DIR = "public/data"; python deploy/api.py
+```
+
+The Vite proxy sends `/api` to it. Without the API, the page falls back to the
+static files in `public/data` and keeps local changes in the browser. Tesseract
+and Poppler are not in the local Python, so recipe OCR needs the NAS container.
+Text and Markdown recipes work locally.
 
 ### Simulate a time
 

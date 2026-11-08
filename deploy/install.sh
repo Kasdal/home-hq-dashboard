@@ -14,6 +14,7 @@ REPO_URL="https://github.com/Kasdal/home-hq-dashboard.git"
 echo "Base directory: ${BASE}"
 
 mkdir -p "${BASE}/releases/bootstrap" "${BASE}/data/photos" "${BASE}/data/photo-cache"
+mkdir -p "${BASE}/data/recipes/files" "${BASE}/data/recipes/thumbs" "${BASE}/.build"
 
 install -m 644 "${HERE}/nginx.conf" "${BASE}/nginx.conf"
 install -m 755 "${HERE}/pull.sh" "${BASE}/pull.sh"
@@ -21,6 +22,7 @@ install -m 755 "${HERE}/photos.py" "${BASE}/photos.py"
 install -m 755 "${HERE}/google_album.py" "${BASE}/google_album.py"
 install -m 755 "${HERE}/nest.py" "${BASE}/nest.py"
 install -m 755 "${HERE}/api.py" "${BASE}/api.py"
+install -m 644 "${HERE}/Dockerfile.api" "${BASE}/Dockerfile.api"
 
 # Remove the retired calendar job and script.
 if crontab -l 2>/dev/null | grep -F "fetch-calendar.py" >/dev/null; then
@@ -90,7 +92,12 @@ fi
 
 docker network inspect "${NETWORK}" >/dev/null 2>&1 || docker network create "${NETWORK}"
 
-# Shopping list API. Runs as the owner of the data folder and has no open port.
+# API image. Tesseract and Poppler read recipe text. Pillow makes thumbnails.
+# The code is mounted at runtime, so a rebuild is only needed for tool changes.
+echo "Building the API image (Tesseract, Poppler, Pillow)..."
+docker build -t homehq-api:local -f "${BASE}/Dockerfile.api" "${BASE}/.build"
+
+# Data API. Runs as the owner of the data folder and has no open port.
 docker rm -f "${API}" >/dev/null 2>&1 || true
 docker run -d \
     --name "${API}" \
@@ -100,7 +107,7 @@ docker run -d \
     -e DATA_DIR=/data \
     -v "${BASE}/api.py:/api/api.py:ro" \
     -v "${BASE}/data:/data" \
-    python:3-alpine python3 /api/api.py
+    homehq-api:local python3 /api/api.py
 
 # Start or replace the web container.
 docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true

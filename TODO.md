@@ -7,6 +7,7 @@ Open work for the Home HQ dashboard. Keep secrets and private data out of this f
 - [ ] **Nest inside temperature.** Header block and `deploy/nest.py` are built. Blocked: the thermostat is in a home owned by another account, so the member token cannot read it. Needs the owner login or a re-add of the device. See `HANDOFF.md` section 14.
 - [ ] **Tasks widget.** Add `tasks.json` and API read/write. Tick off items on the frame. Show the list in the Today widget. Owner will do this later.
 - [ ] **Controls tiles.** Create `controls.json`. Decide which local URLs the tiles call. Send bodyless POST on tap.
+- [x] **Cooking page.** `#cooking` rail item, card grid, live search and full-screen recipe view. Drag-and-drop add for images, PDFs, TXT and MD. Metadata in `data/recipes.json`, files in `data/recipes/files`. Tesseract and Poppler read recipe text. Edit and delete work on the frame.
 - [x] **Photo uploader.** Drag-and-drop page at `/upload/`. Saves JPEG, PNG and WebP files to `data/photos` through `POST /api/photos`. Uploads join the slideshow within about 10 minutes.
 - [ ] **Shopping merge.** Replace last-write-wins with a merge on conflict. Keep the current polling pause.
 

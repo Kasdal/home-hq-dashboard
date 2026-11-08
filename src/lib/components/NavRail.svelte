@@ -6,6 +6,7 @@
   const items = [
     { id: 'today', label: 'Today' },
     { id: 'shopping', label: 'Shopping' },
+    { id: 'cooking', label: 'Cooking' },
     { id: 'photos', label: 'Photos' },
     { id: 'controls', label: 'Controls' },
     { id: 'settings', label: 'Settings' },
@@ -34,6 +35,12 @@
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 8h14l-1.2 12H6.2L5 8z" />
               <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+            </svg>
+          {:else if item.id === 'cooking'}
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.2 10.2a3.1 3.1 0 0 1-1.1-6 4 4 0 0 1 7.6-1.1 3.6 3.6 0 0 1 4.2 5.2 3.1 3.1 0 0 1-1.1 5.9" />
+              <path d="M7.2 10.2V19h9.6v-8.8" />
+              <path d="M7.2 15h9.6" />
             </svg>
           {:else if item.id === 'photos'}
             <svg viewBox="0 0 24 24" aria-hidden="true">

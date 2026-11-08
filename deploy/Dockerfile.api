@@ -1,0 +1,12 @@
+# API image with the tools for recipe text extraction.
+# The API code is mounted at runtime, so this image holds only the tools.
+FROM python:3-alpine
+
+RUN apk add --no-cache \
+    tesseract-ocr \
+    tesseract-ocr-data-eng \
+    tesseract-ocr-data-hrv \
+    poppler-utils \
+    && pip install --no-cache-dir Pillow
+
+WORKDIR /api
