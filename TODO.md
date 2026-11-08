@@ -9,6 +9,7 @@ Open work for the Home HQ dashboard. Keep secrets and private data out of this f
 - [ ] **Controls tiles.** Create `controls.json`. Decide which local URLs the tiles call. Send bodyless POST on tap.
 - [x] **Cooking page.** `#cooking` rail item, card grid, live search and full-screen recipe view. Drag-and-drop add for images, PDFs, TXT and MD. Metadata in `data/recipes.json`, files in `data/recipes/files`. Tesseract and Poppler read recipe text. Edit and delete work on the frame.
 - [x] **Manual recipes with local AI.** Paste free text, add an optional photo and tags, and press `Dodaj uz pomoc AI modela`. Qwen2.5 1.5B runs on the NAS and returns an editable preview. Save creates a manual recipe with ingredients, steps and notes. The model unloads after two idle minutes.
+- [x] **Automatic structure for uploaded recipes.** After OCR, the LLM extracts title, ingredients, steps and notes. All recipe types use the same single-column view. The raw OCR text and original file stay. A failed structure shows a retry button. `llm.autoStructure` turns it off.
 - [x] **Photo uploader.** Drag-and-drop page at `/upload/`. Saves JPEG, PNG and WebP files to `data/photos` through `POST /api/photos`. Uploads join the slideshow within about 10 minutes.
 - [ ] **Shopping merge.** Replace last-write-wins with a merge on conflict. Keep the current polling pause.
 

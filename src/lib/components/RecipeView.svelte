@@ -6,6 +6,7 @@
     saveRecipe,
     deleteRecipe,
     uploadRecipeFile,
+    retryStructure,
   } from '../cooking.svelte.js'
   import { go } from '../route.svelte.js'
 
@@ -21,6 +22,7 @@
   let draftIngredients = $state('')
   let draftSteps = $state('')
   let saving = $state(false)
+  let retrying = $state(false)
   let missing = $state(false)
   let editError = $state('')
   let photoFile = $state(null)
@@ -118,30 +120,27 @@
         .map((tag) => tag.trim())
         .filter(Boolean),
       notes: draftNotes,
+      ingredients: draftIngredients
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean),
+      steps: draftSteps
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean),
     }
 
-    if (recipe.type === 'manual') {
-      patch.ingredients = draftIngredients
-        .split('\n')
-        .map((item) => item.trim())
-        .filter(Boolean)
-      patch.steps = draftSteps
-        .split('\n')
-        .map((item) => item.trim())
-        .filter(Boolean)
-
-      if (photoFile) {
-        photoProgress = 1
-        const uploaded = await uploadRecipeFile(photoFile, (percent) => {
-          photoProgress = percent
-        })
-        if (!uploaded.ok) {
-          saving = false
-          editError = uploaded.error || 'Photo upload failed.'
-          return
-        }
-        patch.photo = uploaded.photo
+    if (recipe.type === 'manual' && photoFile) {
+      photoProgress = 1
+      const uploaded = await uploadRecipeFile(photoFile, (percent) => {
+        photoProgress = percent
+      })
+      if (!uploaded.ok) {
+        saving = false
+        editError = uploaded.error || 'Photo upload failed.'
+        return
       }
+      patch.photo = uploaded.photo
     }
 
     const ok = await saveRecipe(recipe.id, patch)
@@ -155,6 +154,14 @@
     } else {
       editError = 'Could not save the recipe.'
     }
+  }
+
+  async function retry() {
+    if (!recipe || retrying) return
+    retrying = true
+    const ok = await retryStructure(recipe.id)
+    retrying = false
+    if (!ok) editError = 'Could not start the structure step.'
   }
 
   async function remove() {
@@ -184,6 +191,16 @@
     if (current.type === 'pdf') return 'PDF'
     if (current.type === 'text') return 'Text'
     return 'Image'
+  }
+
+  function structureNote(current) {
+    if (current.type === 'manual') return ''
+    if (current.textStatus === 'pending') return 'Reading the text...'
+    if (current.textStatus === 'failed') return 'Text extraction failed.'
+    if (current.structureStatus === 'pending') return 'Structuring the recipe...'
+    if (current.structureStatus === 'failed') return 'The AI could not structure this recipe.'
+    if (current.structureStatus === 'none') return 'Automatic structure is off for this recipe.'
+    return ''
   }
 
   function textLabel(current) {
@@ -232,34 +249,34 @@
       </div>
     </header>
 
-    {#if recipe.type === 'manual'}
-      {#if editing}
-        <div class="cook-doc cook-doc-edit">
-          <label class="cook-field">
-            <span>Title</span>
-            <input bind:value={draftTitle} maxlength="120" disabled={saving} />
-          </label>
+    {#if editing}
+      <div class="cook-doc cook-doc-edit">
+        <label class="cook-field">
+          <span>Title</span>
+          <input bind:value={draftTitle} maxlength="120" disabled={saving} />
+        </label>
 
-          <label class="cook-field">
-            <span>Tags</span>
-            <input bind:value={draftTags} placeholder="soup, winter" disabled={saving} />
-          </label>
+        <label class="cook-field">
+          <span>Tags</span>
+          <input bind:value={draftTags} placeholder="soup, winter" disabled={saving} />
+        </label>
 
-          <label class="cook-field">
-            <span>Ingredients · one per line</span>
-            <textarea bind:value={draftIngredients} rows="8" disabled={saving}></textarea>
-          </label>
+        <label class="cook-field">
+          <span>Ingredients · one per line</span>
+          <textarea bind:value={draftIngredients} rows="8" disabled={saving}></textarea>
+        </label>
 
-          <label class="cook-field">
-            <span>Preparation · one step per line</span>
-            <textarea bind:value={draftSteps} rows="8" disabled={saving}></textarea>
-          </label>
+        <label class="cook-field">
+          <span>Preparation · one step per line</span>
+          <textarea bind:value={draftSteps} rows="8" disabled={saving}></textarea>
+        </label>
 
-          <label class="cook-field">
-            <span>Notes</span>
-            <textarea bind:value={draftNotes} rows="4" disabled={saving}></textarea>
-          </label>
+        <label class="cook-field">
+          <span>Notes</span>
+          <textarea bind:value={draftNotes} rows="4" disabled={saving}></textarea>
+        </label>
 
+        {#if recipe.type === 'manual'}
           <div class="cook-photo-edit">
             {#if photoPreview}
               <img src={photoPreview} alt="" />
@@ -277,201 +294,149 @@
               onchange={onPhoto}
             />
           </div>
+        {/if}
 
-          {#if photoProgress > 0 && photoProgress < 100}
-            <p class="cook-manual-hint">Uploading the photo... {photoProgress}%</p>
-          {/if}
-          {#if editError}
-            <p class="cook-manual-error">{editError}</p>
-          {/if}
+        {#if photoProgress > 0 && photoProgress < 100}
+          <p class="cook-manual-hint">Uploading the photo... {photoProgress}%</p>
+        {/if}
+        {#if editError}
+          <p class="cook-manual-error">{editError}</p>
+        {/if}
 
-          <div class="cook-actions">
-            <button class="cook-primary" type="button" onclick={save} disabled={saving || cooking.saving}>
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-            <button class="cook-secondary" type="button" onclick={cancelEdit} disabled={saving || cooking.saving}>
-              Cancel
-            </button>
-          </div>
+        <div class="cook-actions">
+          <button class="cook-primary" type="button" onclick={save} disabled={saving || cooking.saving}>
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <button class="cook-secondary" type="button" onclick={cancelEdit} disabled={saving || cooking.saving}>
+            Cancel
+          </button>
         </div>
-      {:else}
-        <article class="cook-doc">
-          {#if recipe.fileUrl}
-            <img
-              class="cook-manual-photo"
-              src={recipe.fileUrl}
-              alt={recipe.title}
-              onerror={() => (missing = true)}
-            />
-          {/if}
+      </div>
+    {:else}
+      <article class="cook-doc">
+        {#if (recipe.type === 'image' || recipe.type === 'manual') && recipe.fileUrl}
+          <img
+            class="cook-manual-photo"
+            src={recipe.fileUrl}
+            alt={recipe.title}
+            onerror={() => (missing = true)}
+          />
+        {:else if recipe.type === 'pdf' && recipe.thumbUrl}
+          <img
+            class="cook-manual-photo cook-pdf-thumb"
+            src={recipe.thumbUrl}
+            alt={recipe.title}
+            onerror={() => (missing = true)}
+          />
+        {/if}
 
-          <h1 class="cook-doc-title">{recipe.title}</h1>
-          <div class="cook-meta-row">
-            <span>{typeLabel(recipe)}</span>
-            {#if recipe.size}
-              <span>{formatSize(recipe.size)}</span>
-            {/if}
-            <span>Added {shortDate(recipe.addedAt)}</span>
-            {#if missing}
-              <span class="cook-warn">File missing</span>
+        <h1 class="cook-doc-title">{recipe.title}</h1>
+        <div class="cook-meta-row">
+          <span>{typeLabel(recipe)}</span>
+          {#if recipe.size}
+            <span>{formatSize(recipe.size)}</span>
+          {/if}
+          <span>Added {shortDate(recipe.addedAt)}</span>
+          {#if missing}
+            <span class="cook-warn">File missing</span>
+          {/if}
+        </div>
+
+        {#if recipe.tags.length > 0}
+          <div class="cook-tags">
+            {#each recipe.tags as tag (tag)}
+              <span class="cook-tag">{tag}</span>
+            {/each}
+          </div>
+        {/if}
+
+        {#if structureNote(recipe)}
+          <div class="cook-structure-row">
+            <span class="cook-structure-note">{structureNote(recipe)}</span>
+            {#if recipe.type !== 'manual' && (recipe.structureStatus === 'failed' || recipe.structureStatus === 'none') && recipe.textStatus === 'ready'}
+              <button class="cook-secondary" type="button" onclick={retry} disabled={retrying}>
+                {retrying
+                  ? 'Retrying...'
+                  : recipe.structureStatus === 'failed'
+                    ? 'Retry structure'
+                    : 'Structure with AI'}
+              </button>
             {/if}
           </div>
+        {/if}
 
-          {#if recipe.tags.length > 0}
-            <div class="cook-tags">
-              {#each recipe.tags as tag (tag)}
-                <span class="cook-tag">{tag}</span>
+        {#if recipe.ingredients.length > 0}
+          <section class="cook-doc-section">
+            <h2>Ingredients</h2>
+            <ul class="cook-doc-list">
+              {#each recipe.ingredients as ingredient, index (index)}
+                <li>{ingredient}</li>
               {/each}
-            </div>
-          {/if}
+            </ul>
+          </section>
+        {/if}
 
-          {#if recipe.ingredients.length > 0}
-            <section class="cook-doc-section">
-              <h2>Ingredients</h2>
-              <ul class="cook-doc-list">
-                {#each recipe.ingredients as ingredient, index (index)}
-                  <li>{ingredient}</li>
-                {/each}
-              </ul>
-            </section>
-          {/if}
+        {#if recipe.steps.length > 0}
+          <section class="cook-doc-section">
+            <h2>Preparation</h2>
+            <ol class="cook-doc-steps">
+              {#each recipe.steps as step, index (index)}
+                <li>{step}</li>
+              {/each}
+            </ol>
+          </section>
+        {/if}
 
-          {#if recipe.steps.length > 0}
-            <section class="cook-doc-section">
-              <h2>Preparation</h2>
-              <ol class="cook-doc-steps">
-                {#each recipe.steps as step, index (index)}
-                  <li>{step}</li>
-                {/each}
-              </ol>
-            </section>
-          {/if}
+        {#if recipe.notes}
+          <section class="cook-doc-section">
+            <h2>Notes</h2>
+            <p class="cook-notes">{recipe.notes}</p>
+          </section>
+        {/if}
 
-          {#if recipe.notes}
-            <section class="cook-doc-section">
-              <h2>Notes</h2>
-              <p class="cook-notes">{recipe.notes}</p>
-            </section>
-          {/if}
-        </article>
-      {/if}
-    {:else}
-      <div class="cook-view-body">
-        <section class="cook-preview">
-          {#if recipe.type === 'image'}
-            <img
-              class="cook-image"
-              src={recipe.fileUrl}
-              alt={recipe.title}
-              onerror={() => (missing = true)}
-            />
-          {:else if recipe.type === 'pdf'}
-            {#if isWebView}
-              <div class="cook-pdf-fallback">
-                <span class="cook-type">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M7 3h7l4 4v14H7z" />
-                    <path d="M14 3v4h4" />
-                  </svg>
-                  <b>PDF</b>
-                </span>
-                <strong>PDF preview is not available on this screen.</strong>
-                {#if recipe.text}
-                  <span>Read the extracted text below.</span>
-                {/if}
-              </div>
-            {:else}
-              <object
-                class="cook-pdf"
-                data={recipe.fileUrl}
-                type="application/pdf"
-                aria-label={recipe.title}
-              >
-                <div class="cook-pdf-fallback">
-                  <strong>PDF preview is not available.</strong>
-                  <a href={recipe.fileUrl} target="_blank" rel="noopener">Open PDF</a>
-                </div>
-              </object>
-            {/if}
-          {:else}
-            <pre class="cook-text-main">{recipe.text || 'This file is empty.'}</pre>
-          {/if}
-
-          {#if recipe.type !== 'text'}
-            <details class="cook-extract" open={recipe.type === 'pdf'}>
-              <summary>{textLabel(recipe)}</summary>
-              {#if recipe.textStatus === 'pending'}
+        {#if recipe.type !== 'manual'}
+          {#if recipe.type === 'pdf'}
+            <details class="cook-extract cook-original">
+              <summary>Original PDF</summary>
+              {#if isWebView}
                 <p class="cook-extract-note">
-                  The text is still being read. Search updates when it is ready.
+                  The PDF preview is not available on this screen. The extracted text is below.
                 </p>
-              {:else if recipe.textStatus === 'failed'}
-                <p class="cook-extract-note">
-                  Text extraction failed. The recipe file is still available.
-                </p>
-              {:else if recipe.text}
-                <pre class="cook-extract-text">{recipe.text}</pre>
               {:else}
-                <p class="cook-extract-note">No text was found in this file.</p>
+                <object
+                  class="cook-pdf"
+                  data={recipe.fileUrl}
+                  type="application/pdf"
+                  aria-label={recipe.title}
+                >
+                  <div class="cook-pdf-fallback">
+                    <strong>PDF preview is not available.</strong>
+                    <a href={recipe.fileUrl} target="_blank" rel="noopener">Open PDF</a>
+                  </div>
+                </object>
               {/if}
             </details>
           {/if}
-        </section>
 
-        <section class="cook-side">
-          {#if editing}
-            <div class="cook-edit">
-              <label class="cook-field">
-                <span>Title</span>
-                <input bind:value={draftTitle} maxlength="120" />
-              </label>
-              <label class="cook-field">
-                <span>Tags</span>
-                <input bind:value={draftTags} placeholder="soup, winter" />
-              </label>
-              <label class="cook-field">
-                <span>Notes</span>
-                <textarea bind:value={draftNotes} rows="5"></textarea>
-              </label>
-              <div class="cook-actions">
-                <button
-                  class="cook-primary"
-                  type="button"
-                  onclick={save}
-                  disabled={saving || cooking.saving}
-                >Save</button>
-                <button
-                  class="cook-secondary"
-                  type="button"
-                  onclick={cancelEdit}
-                  disabled={saving || cooking.saving}
-                >Cancel</button>
-              </div>
-            </div>
-          {:else}
-            <h1 class="cook-view-title">{recipe.title}</h1>
-            <div class="cook-meta-row">
-              <span>{typeLabel(recipe)}</span>
-              {#if recipe.size}
-                <span>{formatSize(recipe.size)}</span>
-              {/if}
-              <span>Added {shortDate(recipe.addedAt)}</span>
-              {#if missing}
-                <span class="cook-warn">File missing</span>
-              {/if}
-            </div>
-            {#if recipe.tags.length > 0}
-              <div class="cook-tags">
-                {#each recipe.tags as tag (tag)}
-                  <span class="cook-tag">{tag}</span>
-                {/each}
-              </div>
+          <details class="cook-extract">
+            <summary>{textLabel(recipe)}</summary>
+            {#if recipe.textStatus === 'pending'}
+              <p class="cook-extract-note">
+                The text is still being read. The structure follows after it.
+              </p>
+            {:else if recipe.textStatus === 'failed'}
+              <p class="cook-extract-note">
+                Text extraction failed. The recipe file is still available. You can edit the
+                fields above.
+              </p>
+            {:else if recipe.text}
+              <pre class="cook-extract-text">{recipe.text}</pre>
+            {:else}
+              <p class="cook-extract-note">No text was found in this file.</p>
             {/if}
-            {#if recipe.notes}
-              <p class="cook-notes">{recipe.notes}</p>
-            {/if}
-          {/if}
-        </section>
-      </div>
+          </details>
+        {/if}
+      </article>
     {/if}
   </div>
 {/if}

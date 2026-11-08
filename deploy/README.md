@@ -256,7 +256,8 @@ is the most reliable option.
 The page is at `#cooking`. It has a search field, a card grid and a full-screen
 recipe view. To add a recipe, drop a file on the page or use "+ Add recipe".
 The accepted types are JPEG, PNG, WebP, PDF, TXT and MD. The limit is 20 MB per
-file. One file makes one recipe.
+file. One file makes one recipe. The recipe view uses the same single-column
+document for all types: image, PDF, text and manual.
 
 Recipe files live in `~/homehq/data/recipes/files`. Thumbnails live in
 `~/homehq/data/recipes/thumbs`. The metadata lives in
@@ -269,8 +270,11 @@ Recipe files live in `~/homehq/data/recipes/files`. Thumbnails live in
     {
       "id": "145390fb",
       "title": "Grandma's Soup",
+      "titleAuto": false,
       "tags": ["soup", "winter"],
       "notes": "Use beef stock.",
+      "ingredients": ["2 onions", "1 carrot"],
+      "steps": ["Chop the vegetables.", "Cook slowly."],
       "file": "Grandma-Soup-145390.md",
       "type": "text",
       "mime": "text/markdown",
@@ -280,7 +284,10 @@ Recipe files live in `~/homehq/data/recipes/files`. Thumbnails live in
       "text": "Grandma Soup\n\n- 2 onions...",
       "textSource": "file",
       "textStatus": "ready",
-      "textAt": "2026-11-08T12:36:00"
+      "textAt": "2026-11-08T12:36:00",
+      "structureStatus": "ready",
+      "structureSource": "llm",
+      "structureAt": "2026-11-08T12:36:30"
     }
   ]
 }
@@ -299,9 +306,15 @@ Text extraction runs in a background worker in the API container:
 - Pending jobs are retried at startup and every 60 seconds.
 - A failed job keeps the recipe file and sets `textStatus` to `failed`.
 
+After the text is ready, a second worker sends up to 4,000 characters to the
+same local LLM. It stores `ingredients`, `steps` and `notes`, and sets
+`structureStatus` to `ready` or `failed`. The full OCR text stays in `text`.
+The background worker runs one parse at a time. A manual parse has priority
+over queued background work. The structure step uses the same Qwen2.5 model.
+
 The page polls `/api/recipes` every 30 seconds. The search matches title, tags,
-notes and text. The page uses the extract for search only after the job
-finishes.
+notes, ingredients, steps and text. The structure appears after the job
+finishes. A failed structure keeps the raw text and shows a retry button.
 
 Endpoints:
 
@@ -310,6 +323,7 @@ POST   /api/photos?kind=recipe&name=      -> raw file body, creates a recipe
 POST   /api/photos?kind=recipe-file&name= -> upload a photo only
 POST   /api/recipes/parse                 -> parse free text with the local LLM
 POST   /api/recipes/manual                -> create a manual recipe
+POST   /api/recipes/structure?id=         -> retry the structure step
 GET    /api/recipes                       -> {"rev":...,"recipes":[...]}
 POST   /api/recipes                       -> update fields and replace a photo
 DELETE /api/recipes?id=                   -> remove the entry, file and thumbnail
@@ -354,10 +368,43 @@ The parse endpoint has a 180 second timeout in nginx. A 4,000 character paste
 takes longer than the normal 15 second API timeout, so it has its own location
 block.
 
-The recipe view shows images directly. It shows PDFs in an `<object>` on a PC.
-On the Android WebView the PDF object does not work, so the page hides the
-direct link and shows the extracted text instead. A recipe with a missing file
-shows a "File missing" tag and keeps the metadata.
+#### Automatic structure for uploaded recipes
+
+When `llm.autoStructure` is true, the API structures uploaded recipes too:
+
+- After OCR finishes, up to 4,000 characters go to the LLM.
+- The model returns title, ingredients, steps and notes.
+- The original file and the full OCR text stay.
+- The title changes only when `titleAuto` is true, which means the file-name
+  title is still in use. A user rename sets `titleAuto` to false.
+- The user can edit ingredients and steps for file recipes in the same form.
+- A failed structure keeps the raw text and shows "Retry structure".
+- `structureStatus` is `pending`, `ready`, `failed` or `none`.
+- The background worker runs one parse at a time. Manual parses have priority.
+
+The recipe view uses one layout for every type:
+
+- A photo or image at the top.
+- Title, meta and tags.
+- Ingredients, Preparation and Notes sections.
+- An "Original PDF" panel on a PC. The Android WebView hides the object and
+  says the preview is not available.
+- A collapsible raw text panel. For images and PDFs it shows the OCR text. For
+  TXT and MD files it shows the file text.
+- A missing file shows a "File missing" tag and keeps the metadata.
+
+The settings:
+
+```json
+"llm": {
+  "enabled": true,
+  "autoStructure": true
+}
+```
+
+`enabled` is the master switch. `autoStructure` controls the background step
+for uploaded files. Set it to false to keep the raw text only. The manual
+"Paste recipe" form still needs `enabled`.
 
 The API image is built from `Dockerfile.api`. It adds about 100 MB to the image.
 Only the API container can read the recipe folders. The web container serves

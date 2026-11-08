@@ -69,6 +69,12 @@ export function normalizeRecipe(raw) {
       ? raw.textStatus
       : 'none',
     textAt: asText(raw.textAt, 30),
+    structureStatus: ['pending', 'ready', 'failed', 'none'].includes(raw.structureStatus)
+      ? raw.structureStatus
+      : 'none',
+    structureSource: asText(raw.structureSource, 20),
+    structureAt: asText(raw.structureAt, 30),
+    titleAuto: Boolean(raw.titleAuto),
   }
 
   recipe.fileUrl = recipe.file
@@ -177,10 +183,8 @@ export async function saveRecipe(id, patch) {
         title: recipe.title,
         tags: recipe.tags,
         notes: recipe.notes,
-      }
-      if (recipe.type === 'manual') {
-        item.ingredients = recipe.ingredients
-        item.steps = recipe.steps
+        ingredients: recipe.ingredients,
+        steps: recipe.steps,
       }
       if (recipe.id === id && Object.prototype.hasOwnProperty.call(patch, 'photo')) {
         item.photo = patch.photo
@@ -222,6 +226,27 @@ export async function deleteRecipe(id) {
     return true
   } catch {
     showToast('Could not remove the recipe')
+    return false
+  }
+}
+
+export async function retryStructure(id) {
+  try {
+    const response = await fetch('/api/recipes/structure?id=' + encodeURIComponent(id), {
+      method: 'POST',
+    })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      showToast(body.error || 'Could not structure the recipe')
+      return false
+    }
+    cooking.recipes = cooking.recipes.map((recipe) =>
+      recipe.id === id ? { ...recipe, structureStatus: 'pending' } : recipe
+    )
+    showToast('Structuring the recipe')
+    return true
+  } catch {
+    showToast('Could not structure the recipe')
     return false
   }
 }

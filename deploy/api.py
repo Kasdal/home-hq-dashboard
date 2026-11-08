@@ -79,6 +79,8 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 STAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$")
 
 OCR_QUEUE = queue.Queue()
+STRUCTURE_QUEUE = queue.Queue()
+MANUAL_WAITING = threading.Event()
 
 
 def write_doc(path, doc):
@@ -404,9 +406,12 @@ def save_recipe_upload(raw_name, data):
     elif kind == "pdf" and make_pdf_thumb(path, thumb_path):
         thumb = thumb_name
 
+    structure_status = "pending" if auto_structure_enabled() else "none"
+
     recipe = {
         "id": recipe_id,
         "title": recipe_title(raw_name),
+        "titleAuto": True,
         "tags": [],
         "notes": "",
         "file": name,
@@ -419,6 +424,9 @@ def save_recipe_upload(raw_name, data):
         "textSource": text_source,
         "textStatus": text_status,
         "textAt": text_at,
+        "structureStatus": structure_status,
+        "structureSource": "",
+        "structureAt": "",
     }
 
     with LOCK:
@@ -428,6 +436,9 @@ def save_recipe_upload(raw_name, data):
         doc["recipes"] = recipes
         doc["rev"] = int(time.time())
         write_doc(RECIPES_FILE, doc)
+
+    if kind == "text" and structure_status == "pending":
+        STRUCTURE_QUEUE.put(recipe_id)
 
     return recipe
 
@@ -505,6 +516,14 @@ def update_recipe_text(recipe_id, text, source, status, thumb=None):
                 recipe["textAt"] = time.strftime("%Y-%m-%dT%H:%M:%S")
                 if thumb:
                     recipe["thumb"] = thumb
+                if status == "ready" and text.strip():
+                    recipe["structureStatus"] = (
+                        "pending" if auto_structure_enabled() else "none"
+                    )
+                else:
+                    recipe["structureStatus"] = "failed"
+                recipe["structureSource"] = ""
+                recipe["structureAt"] = ""
                 doc["rev"] = int(time.time())
                 write_doc(RECIPES_FILE, doc)
                 return True
@@ -556,6 +575,8 @@ def process_recipe(recipe_id):
         text, source, status = "", "", "failed"
 
     update_recipe_text(recipe_id, text, source, status, thumb)
+    if status == "ready" and text.strip() and auto_structure_enabled():
+        STRUCTURE_QUEUE.put(recipe_id)
 
 
 def pending_recipe_ids():
@@ -587,6 +608,123 @@ def recipe_worker():
             )
 
 
+def pending_structure_ids():
+    doc = read_doc(RECIPES_FILE, DEFAULT_RECIPES)
+    return [
+        item["id"]
+        for item in doc.get("recipes", [])
+        if isinstance(item, dict)
+        and item.get("id")
+        and item.get("structureStatus") == "pending"
+        and item.get("textStatus") == "ready"
+    ]
+
+
+def process_structure(recipe_id):
+    with LOCK:
+        doc = read_doc(RECIPES_FILE, DEFAULT_RECIPES)
+        recipe = next(
+            (
+                item
+                for item in doc.get("recipes", [])
+                if isinstance(item, dict) and item.get("id") == recipe_id
+            ),
+            None,
+        )
+        if not recipe or recipe.get("type") == "manual":
+            return
+        if recipe.get("structureStatus") != "pending":
+            return
+        snapshot = dict(recipe)
+
+    if not auto_structure_enabled():
+        with LOCK:
+            doc = read_doc(RECIPES_FILE, DEFAULT_RECIPES)
+            for recipe in doc.get("recipes", []):
+                if isinstance(recipe, dict) and recipe.get("id") == recipe_id:
+                    recipe["structureStatus"] = "none"
+                    doc["rev"] = int(time.time())
+                    write_doc(RECIPES_FILE, doc)
+                    break
+        return
+
+    text = str(snapshot.get("text") or "").strip()
+    if not text:
+        with LOCK:
+            doc = read_doc(RECIPES_FILE, DEFAULT_RECIPES)
+            for recipe in doc.get("recipes", []):
+                if isinstance(recipe, dict) and recipe.get("id") == recipe_id:
+                    recipe["structureStatus"] = "failed"
+                    recipe["structureAt"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+                    doc["rev"] = int(time.time())
+                    write_doc(RECIPES_FILE, doc)
+                    break
+        return
+
+    try:
+        parsed = parse_with_llm(text[:MAX_MANUAL_TEXT])
+        status = "ready"
+    except Exception as error:
+        print(
+            "recipe structure failed for %s: %s" % (recipe_id, type(error).__name__),
+            flush=True,
+        )
+        parsed = None
+        status = "failed"
+
+    with LOCK:
+        doc = read_doc(RECIPES_FILE, DEFAULT_RECIPES)
+        recipe = next(
+            (
+                item
+                for item in doc.get("recipes", [])
+                if isinstance(item, dict) and item.get("id") == recipe_id
+            ),
+            None,
+        )
+        if not recipe or recipe.get("structureStatus") != "pending":
+            return
+        recipe["structureStatus"] = status
+        recipe["structureSource"] = "llm"
+        recipe["structureAt"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        if parsed:
+            recipe["ingredients"] = parsed["ingredients"]
+            recipe["steps"] = parsed["steps"]
+            if not str(recipe.get("notes") or "").strip():
+                recipe["notes"] = parsed["notes"]
+            if (
+                recipe.get("titleAuto")
+                and parsed["title"]
+                and parsed["title"] != "Untitled recipe"
+            ):
+                recipe["title"] = parsed["title"]
+                recipe["titleAuto"] = False
+        doc["rev"] = int(time.time())
+        write_doc(RECIPES_FILE, doc)
+        print(
+            "recipes: structure %s for %s (%d ingredients, %d steps)"
+            % (status, recipe_id, len(recipe.get("ingredients", [])), len(recipe.get("steps", []))),
+            flush=True,
+        )
+
+
+def structure_worker():
+    for recipe_id in pending_structure_ids():
+        STRUCTURE_QUEUE.put(recipe_id)
+
+    while True:
+        recipe_id = STRUCTURE_QUEUE.get()
+        while MANUAL_WAITING.is_set():
+            time.sleep(0.5)
+        try:
+            process_structure(recipe_id)
+        except Exception as error:
+            print(
+                "structure worker error for %s: %s" % (recipe_id, type(error).__name__),
+                flush=True,
+            )
+
+
 LIST_MARKER_RE = re.compile(
     r"^\s*(?:[-*•·]|\(\d+\)|\d+[.)]|step\s*\d+[.:)])\s*",
     re.IGNORECASE,
@@ -606,6 +744,15 @@ def llm_enabled():
     llm = load_app_config().get("llm")
     if isinstance(llm, dict):
         return bool(llm.get("enabled", True))
+    return True
+
+
+def auto_structure_enabled():
+    llm = load_app_config().get("llm")
+    if isinstance(llm, dict):
+        if not llm.get("enabled", True):
+            return False
+        return bool(llm.get("autoStructure", True))
     return True
 
 
@@ -813,6 +960,7 @@ def create_manual_recipe(payload):
     return {
         "id": recipe_id,
         "title": clean["title"],
+        "titleAuto": False,
         "tags": clean["tags"],
         "notes": clean["notes"],
         "ingredients": clean["ingredients"],
@@ -827,6 +975,9 @@ def create_manual_recipe(payload):
         "textSource": "manual",
         "textStatus": "ready",
         "textAt": now,
+        "structureStatus": "ready",
+        "structureSource": "manual",
+        "structureAt": now,
     }
 
 
@@ -860,14 +1011,17 @@ def validate_recipes(payload, current):
 
         merged = dict(old)
         merged["title"] = title
+        if title != str(old.get("title") or ""):
+            merged["titleAuto"] = False
         merged["tags"] = clean_tags(item.get("tags"))
         merged["notes"] = str(item.get("notes", ""))[:2000]
 
+        if "ingredients" in item:
+            merged["ingredients"] = clean_string_list(item.get("ingredients"), 100, 200)
+        if "steps" in item:
+            merged["steps"] = clean_string_list(item.get("steps"), 100, 1000)
+
         if old.get("type") == "manual":
-            if "ingredients" in item:
-                merged["ingredients"] = clean_string_list(item.get("ingredients"), 100, 200)
-            if "steps" in item:
-                merged["steps"] = clean_string_list(item.get("steps"), 100, 1000)
             if "photo" in item:
                 if item.get("photo"):
                     photo = clean_photo(item.get("photo"))
@@ -899,6 +1053,14 @@ def validate_recipes(payload, current):
             )
             merged["textSource"] = "manual"
             merged["textStatus"] = "ready"
+            merged["structureStatus"] = "ready"
+            merged["structureSource"] = "manual"
+        elif ("ingredients" in item or "steps" in item) and (
+            merged.get("ingredients") or merged.get("steps")
+        ):
+            merged["structureStatus"] = "ready"
+            merged["structureSource"] = "edit"
+            merged["structureAt"] = time.strftime("%Y-%m-%dT%H:%M:%S")
 
         clean.append(merged)
 
@@ -1118,6 +1280,46 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"name": name, "existed": existed, "url": photo_src(name)})
             return
 
+        if path == "/recipes/structure":
+            recipe_id = (query.get("id") or [""])[0]
+            if not recipe_id:
+                self.send_json(400, {"error": "id is required"})
+                return
+
+            with LOCK:
+                doc = read_doc(RECIPES_FILE, DEFAULT_RECIPES)
+                recipe = next(
+                    (
+                        item
+                        for item in doc.get("recipes", [])
+                        if isinstance(item, dict) and item.get("id") == recipe_id
+                    ),
+                    None,
+                )
+                if not recipe:
+                    self.send_json(404, {"error": "no such recipe"})
+                    return
+                if recipe.get("type") == "manual":
+                    self.send_json(400, {"error": "manual recipes are already structured"})
+                    return
+                if recipe.get("textStatus") != "ready" or not str(recipe.get("text") or "").strip():
+                    self.send_json(409, {"error": "text is not ready"})
+                    return
+                if not auto_structure_enabled():
+                    self.send_json(503, {"error": "AI structure is off"})
+                    return
+
+                recipe["structureStatus"] = "pending"
+                recipe["structureSource"] = ""
+                recipe["structureAt"] = ""
+                doc["rev"] = int(time.time())
+                write_doc(RECIPES_FILE, doc)
+
+            STRUCTURE_QUEUE.put(recipe_id)
+            print("recipes: structure queued for %s" % recipe_id, flush=True)
+            self.send_json(200, {"ok": True, "id": recipe_id})
+            return
+
         if length <= 0 or length > MAX_BODY:
             self.send_json(413, {"error": "body too large or empty"})
             return
@@ -1130,6 +1332,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/recipes/parse":
             try:
+                MANUAL_WAITING.set()
                 parsed = parse_with_llm(payload.get("text") if isinstance(payload, dict) else "")
             except ValueError as error:
                 self.send_json(400, {"error": str(error)})
@@ -1141,6 +1344,8 @@ class Handler(BaseHTTPRequestHandler):
                 print("recipes: parse failed: %s" % type(error).__name__, flush=True)
                 self.send_json(502, {"error": "AI parse failed"})
                 return
+            finally:
+                MANUAL_WAITING.clear()
 
             print(
                 "recipes: AI parsed %d ingredients, %d steps"
@@ -1321,6 +1526,7 @@ def main():
             print("warning: %s is missing, text extraction will fail" % tool, flush=True)
 
     threading.Thread(target=recipe_worker, daemon=True, name="recipe-worker").start()
+    threading.Thread(target=structure_worker, daemon=True, name="structure-worker").start()
     print("homehq api on port %d, data %s" % (PORT, DATA_DIR), flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 

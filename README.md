@@ -78,9 +78,19 @@ titles, tags, notes and extracted text.
 
 A background worker on the NAS reads text from images and PDFs with Tesseract
 and Poppler. TXT and MD files are read directly. Text is capped at 20,000
-characters. The API image needs about 100 MB extra for the tools. Edit the
-title, tags and notes in the recipe view. Delete removes the entry, file and
-thumbnail.
+characters. The API image needs about 100 MB extra for the tools.
+
+After the text is ready, the same local LLM structures uploaded recipes into
+title, ingredients, steps and notes. The cap for the model input is 4,000
+characters. The original file and the full OCR text stay available. A failed
+structure keeps the raw text and shows a retry button. The setting
+`llm.autoStructure` turns the background step off.
+
+All recipe types use the same single-column view: image or photo, title, meta,
+tags, Ingredients, Preparation and Notes. A PDF has an original-file panel on a
+PC. The frame shows the structured text. The raw OCR text stays in a collapsible
+panel. Edit works for title, tags, ingredients, steps and notes. Delete removes
+the entry, file and thumbnail.
 
 The page also has a "Paste recipe" form. Paste any recipe text up to 4,000
 characters, add an optional photo and tags, then press `Dodaj uz pomoc AI

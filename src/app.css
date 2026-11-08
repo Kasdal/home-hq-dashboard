@@ -2878,3 +2878,21 @@ code {
     grid-template-columns: 1fr;
   }
 }
+
+.cook-structure-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.cook-structure-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.cook-pdf-thumb {
+  background: #ffffff;
+}
