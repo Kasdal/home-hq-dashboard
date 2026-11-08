@@ -62,8 +62,8 @@ The installer does these things:
 Run it again after a change to `nginx.conf`, `pull.sh`, `api.py`,
 `photos.py` or `Dockerfile.api`. The containers are replaced, and the cron
 entries are not duplicated. The first image build takes a few minutes. Later
-builds use the cached layers. The first model pull is about 1 GB. Later runs
-reuse the model volume.
+builds use the cached layers. The Ollama image is 8.5 GB and the model is
+986 MB. Later runs reuse the model volume.
 
 ## Port
 
@@ -360,8 +360,8 @@ The model is Qwen2.5 1.5B Q4. The `homehq-llm` container has no published port.
 The model loads on the first parse, and unloads after two idle minutes. Idle RAM
 for the container is about 100-200 MB. A parse uses about 1.5-2 GB RAM and all
 four CPU cores for about 20 seconds. Use `LLM_THREADS=3` in the API to leave one
-core free. The first run pulls about 1 GB. The model volume is
-`~/homehq/llm`.
+core free. The Ollama image is 8.5 GB and the model is 986 MB. The model volume
+is `~/homehq/llm`.
 
 If the parse fails, the add fails. The form keeps the text and shows an error.
 The user can retry. There is no silent fallback to Notes. The `llm.enabled`
@@ -417,6 +417,58 @@ The API image is built from `Dockerfile.api`. It adds about 100 MB to the image.
 Only the API container can read the recipe folders. The web container serves
 them read-only at `/data/recipes/`, because they are under `data/`. There is no
 login. The nginx allow list keeps the page on the private network.
+
+#### AI setup and rebuild
+
+Components:
+
+- `homehq-llm`: `ollama/ollama:latest`, no published port, network `homehq`,
+  volume `~/homehq/llm:/root/.ollama`. Current image digest:
+  `sha256:0e59999e0e8f9fd4e704bd788a89b7e4cad399367fb1365f8c102ac662288761`.
+  The image is 8.5 GB.
+- Model: `qwen2.5:1.5b`, Q4_K_M, 986 MB, model ID `65ec06548149`, context
+  32768, Apache 2.0.
+- API defaults: `LLM_URL=http://homehq-llm:11434`,
+  `LLM_MODEL=qwen2.5:1.5b`, `LLM_TIMEOUT=180`, `LLM_THREADS=3`,
+  `MAX_MANUAL_TEXT=4000`.
+- Request: `POST /api/generate`, `stream:false`, `format` JSON schema,
+  `temperature:0`, `num_ctx:4096`, `keep_alive:2m`.
+- The prompt, schema and support check are in `deploy/api.py`.
+
+The API starts the model on the first parse. The model unloads after two idle
+minutes. The API sends one parse at a time. Manual parses have priority.
+
+Fresh rebuild:
+
+1. Install Docker on the NAS.
+2. Copy `deploy/` to `~/homehq-setup`.
+3. Run `bash ~/homehq-setup/deploy/install.sh`.
+4. The installer pulls the Ollama image, starts `homehq-llm`, pulls
+   `qwen2.5:1.5b`, builds `homehq-api:local`, and starts nginx.
+5. Restore the private files: `data/config.json`, `data/recipes.json`,
+   `data/recipes/files`, `data/recipes/thumbs`. The model cache is
+   `~/homehq/llm`. The model is fetched again if the cache is empty.
+6. Check:
+
+```bash
+docker exec homehq-llm ollama list
+curl http://127.0.0.1:8088/api/recipes
+curl -X POST http://127.0.0.1:8088/api/recipes/parse \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Milk, 200ml. Mix and serve."}'
+```
+
+7. Keep `llm.enabled` and `llm.autoStructure` in `/data/config.json`.
+
+The installer uses the `latest` Ollama tag and the `qwen2.5:1.5b` tag. For an
+exact rebuild, pin the image digest and model version.
+
+Disk: about 9.5 GB for the Ollama image and model, plus about 100 MB for the
+API image. Memory: about 1.5-2 GB during a parse. The container idles at about
+100-200 MB. Hardware tested: Intel N100, 4 cores, 7.5 GB RAM, AVX2.
+
+The `homehq-llm` container has no published port. Pasted text stays on the NAS.
+The model does not call a cloud service. The model and image are not in git.
 
 ### Bin schedule and alert
 
