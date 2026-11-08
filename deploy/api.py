@@ -14,6 +14,8 @@ POST   /recipes   -> update titles, tags, notes and manual fields
 POST   /recipes/parse  -> parse free text with the local LLM
 POST   /recipes/manual -> create a manual recipe
 DELETE /recipes   -> remove one recipe and its files, ?id=...
+GET    /plan      -> meal plan
+POST   /plan      -> replace the meal plan
 
 Files are written with a temporary file and os.replace, so a reader never sees
 a half-written document. Only the standard library is used. OCR calls the
@@ -44,6 +46,7 @@ STATE_FILE = os.path.join(DATA_DIR, "state.json")
 PHOTOS_DIR = os.path.join(DATA_DIR, "photos")
 INDEX_FILE = os.path.join(DATA_DIR, "photos-index.json")
 RECIPES_FILE = os.path.join(DATA_DIR, "recipes.json")
+PLAN_FILE = os.path.join(DATA_DIR, "plan.json")
 RECIPE_FILES = os.path.join(DATA_DIR, "recipes", "files")
 RECIPE_THUMBS = os.path.join(DATA_DIR, "recipes", "thumbs")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
@@ -51,6 +54,8 @@ PORT = int(os.environ.get("PORT", "8099"))
 MAX_BODY = 128 * 1024
 MAX_UPLOAD = 20 * 1024 * 1024
 STATE_KEEP_DAYS = 60
+PLAN_KEEP_DAYS = 60
+PLAN_MAX_DAYS = 120
 MAX_RECIPE_TEXT = 20000
 OCR_TIMEOUT = 120
 OCR_PAGES = 10
@@ -74,9 +79,11 @@ DEFAULT_SHOPPING = {
 
 DEFAULT_STATE = {"bins": {}}
 DEFAULT_RECIPES = {"rev": 1, "recipes": []}
+DEFAULT_PLAN = {"rev": 1, "days": {}}
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 STAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$")
+PLAN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 
 OCR_QUEUE = queue.Queue()
 STRUCTURE_QUEUE = queue.Queue()
@@ -1218,6 +1225,37 @@ def prune_state(doc):
     return {"bins": kept}
 
 
+def clean_plan(doc, stamp=False):
+    if not isinstance(doc, dict):
+        raise ValueError("body must be an object")
+
+    days = doc.get("days")
+    if not isinstance(days, dict):
+        raise ValueError("days must be an object")
+
+    cutoff = time.strftime("%Y-%m-%d", time.localtime(time.time() - PLAN_KEEP_DAYS * 86400))
+    kept = {}
+    for date, entry in days.items():
+        date = str(date)
+        if not DATE_RE.match(date) or date < cutoff:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        recipe_id = str(entry.get("recipeId") or "").strip()
+        if not PLAN_ID_RE.match(recipe_id):
+            continue
+        title = " ".join(str(entry.get("title") or "").split())[:120]
+        kept[date] = {"recipeId": recipe_id, "title": title}
+
+    if len(kept) > PLAN_MAX_DAYS:
+        raise ValueError("too many days")
+
+    return {
+        "rev": int(time.time()) if stamp else int(doc.get("rev") or 1),
+        "days": kept,
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "HomeHQ/1.2"
 
@@ -1257,6 +1295,14 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/recipes":
             self.send_json(200, read_doc(RECIPES_FILE, DEFAULT_RECIPES))
+            return
+
+        if path == "/plan":
+            try:
+                doc = clean_plan(read_doc(PLAN_FILE, DEFAULT_PLAN))
+            except ValueError:
+                doc = dict(DEFAULT_PLAN)
+            self.send_json(200, doc)
             return
 
         self.send_json(404, {"error": "not found"})
@@ -1465,6 +1511,24 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, clean)
             return
 
+        if path == "/plan":
+            try:
+                clean = clean_plan(payload, stamp=True)
+            except Exception as error:
+                self.send_json(400, {"error": str(error)})
+                return
+
+            with LOCK:
+                try:
+                    write_doc(PLAN_FILE, clean)
+                except Exception as error:
+                    self.send_json(500, {"error": "write failed: %s" % type(error).__name__})
+                    return
+
+            print("plan: saved %d days" % len(clean["days"]), flush=True)
+            self.send_json(200, clean)
+            return
+
         if path == "/state":
             bin_entry = payload.get("bin") if isinstance(payload, dict) else None
             if not isinstance(bin_entry, dict):
@@ -1586,6 +1650,7 @@ def main():
     read_doc(SHOPPING_FILE, DEFAULT_SHOPPING)
     read_doc(STATE_FILE, DEFAULT_STATE)
     read_doc(RECIPES_FILE, DEFAULT_RECIPES)
+    read_doc(PLAN_FILE, DEFAULT_PLAN)
 
     for tool in ("tesseract", "pdftotext", "pdftoppm"):
         if not shutil.which(tool):

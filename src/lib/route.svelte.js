@@ -1,4 +1,4 @@
-export const PAGES = ['today', 'shopping', 'cooking', 'photos', 'controls', 'settings']
+export const PAGES = ['today', 'shopping', 'cooking', 'plan', 'photos', 'controls', 'settings']
 
 export const route = $state({ page: 'today', recipeId: null })
 

@@ -11,6 +11,8 @@ Open work for the Home HQ dashboard. Keep secrets and private data out of this f
 - [x] **Manual recipes with local AI.** Paste free text, add an optional photo and tags, and press `Dodaj uz pomoc AI modela`. Qwen2.5 1.5B runs on the NAS and returns an editable preview. Save creates a manual recipe with ingredients, steps and notes. The model unloads after two idle minutes.
 - [x] **Automatic structure for uploaded recipes.** After OCR, the LLM extracts title, ingredients, steps and notes. All recipe types use the same single-column view. The raw OCR text and original file stay. A failed structure shows a retry button. `llm.autoStructure` turns it off.
 - [x] **Photo uploader.** Drag-and-drop page at `/upload/`. Saves JPEG, PNG and WebP files to `data/photos` through `POST /api/photos`. Uploads join the slideshow within about 10 minutes.
+- [x] **Meal plan.** `#plan` page with a seven-day list and recipe picker. The Today middle column shows a Tonight / Tasks tab. "Surprise me" favors warm food at 18 °C or cooler and light food over 18 °C. "Add ingredients" writes the recipe lines to the shared shopping list. `data/plan.json` through `/api/plan`. Built and checked locally; not deployed.
+- [ ] **Rain nowcast, cook mode, dates card.** Optional ideas with notes and costs. See `HANDOFF.md` section 16.
 - [ ] **Shopping merge.** Replace last-write-wins with a merge on conflict. Keep the current polling pause.
 
 ## Data safety

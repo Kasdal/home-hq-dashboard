@@ -7,7 +7,9 @@
     deleteRecipe,
     uploadRecipeFile,
     retryStructure,
+    showToast,
   } from '../cooking.svelte.js'
+  import { addIngredients } from '../shopping.svelte.js'
   import { go } from '../route.svelte.js'
 
   let { id } = $props()
@@ -211,6 +213,24 @@
     if (current.textSource === 'pdf') return 'PDF text'
     return 'Text file'
   }
+
+  function addToList() {
+    if (!recipe) return
+    const result = addIngredients(recipe.ingredients, recipe.title)
+    if (result.added === 0 && result.skipped === 0) {
+      showToast('Nothing to add')
+      return
+    }
+    if (result.added === 0) {
+      showToast(`${result.skipped} ingredients already on the shopping list`)
+      return
+    }
+    showToast(
+      result.skipped
+        ? `${result.added} added · ${result.skipped} already listed`
+        : `${result.added} ingredients added to shopping`
+    )
+  }
 </script>
 
 {#if !recipe && !cooking.loaded}
@@ -372,7 +392,12 @@
 
         {#if recipe.ingredients.length > 0}
           <section class="cook-doc-section">
-            <h2>Ingredients</h2>
+            <div class="cook-doc-head">
+              <h2>Ingredients</h2>
+              <button class="cook-secondary cook-add-list" type="button" onclick={addToList}>
+                Add to shopping
+              </button>
+            </div>
             <ul class="cook-doc-list">
               {#each recipe.ingredients as ingredient, index (index)}
                 <li>{ingredient}</li>

@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "check": "node scripts/check-schedule.mjs",
+    "check": "node scripts/check-schedule.mjs && node scripts/check-plan.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173"
   },
   "devDependencies": {

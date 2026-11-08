@@ -17,12 +17,13 @@ no framework server.
 | Today | Big clock and weather, garbage, shopping, tasks, photos, cat feeding, controls |
 | Shopping | Full shared list with store filter, quantities and usuals |
 | Cooking | Recipe grid, live search, full-screen recipe view, drag-and-drop add |
+| Plan | Seven-day meal plan, recipe picker, Surprise me, add ingredients |
 | Photos | Full-screen slideshow |
 | Controls | Large tiles for home actions |
 | Settings | Light / Auto / Dark theme and build information |
 
 The navigation rail uses hash routes: `#today`, `#shopping`, `#cooking`,
-`#photos`, `#controls`, `#settings`.
+`#plan`, `#photos`, `#controls`, `#settings`.
 
 ## Today widgets
 
@@ -32,6 +33,7 @@ The navigation rail uses hash routes: `#today`, `#shopping`, `#cooking`,
 | Garbage bins | Thursday schedule from `/data/bins.json`, with bin-day alert |
 | Shopping | `/data/shopping.json` through `/api/shopping` |
 | Tasks | `/data/tasks.json` |
+| Tonight | `/data/plan.json` through `/api/plan` |
 | Photos | Google Photos album, cache or local folder |
 | Cat feeding | Two rounds per day, stored in the browser |
 | Inside temperature | Nest thermostat, from `/data/nest.json` |
@@ -107,6 +109,32 @@ The recipe file lives in `~/homehq/data/recipes/files`. The page works on the
 frame and on a PC. Android WebView cannot show PDFs, so the frame shows the
 extracted text instead.
 
+## Meal plan
+
+The Plan page at `#plan` holds one recipe per day for the next seven days. Tap
+a day, then pick a recipe on the right. The search matches title, tags,
+ingredients and steps.
+
+"Surprise me" picks a recipe for the selected day or for one row. A day over
+18 °C counts as warm and favors light dishes such as salad, grill or cold food.
+A day at 18 °C or cooler favors soups, stews, roasts and baked dishes. With no
+match, the pick is random. The pick avoids the current meal and the previous
+day's meal when it can.
+
+"Add ingredients" writes the recipe ingredients to the shared shopping list.
+The amount goes into the note, for example "500 g · Sarma". Items already on
+the open list are skipped. The same action is in the recipe view as "Add to
+shopping".
+
+The Today page shows tonight's meal in the middle column. The Tasks tab sits
+next to it. The Tonight card shows the meal, the climate hint, Add ingredients
+and Surprise me.
+
+The plan lives in `/data/plan.json` through `/api/plan`. The page polls every
+60 seconds and keeps a local backup. The file is part of the NAS backup. A
+deleted recipe keeps its title snapshot and shows "Recipe removed" until the
+day is cleared.
+
 ## Sleep screen
 
 After two minutes without a tap or key, the dashboard becomes a full-screen
@@ -129,7 +157,7 @@ Open the printed address at 1280x800. To see widgets with data, create
 `public/data/shopping.json`. That folder is ignored by git.
 
 ```bash
-npm run check   # bin parity and cat feed cycle tests
+npm run check   # bin, cat and meal plan tests
 npm run build   # production build in dist/
 npm run preview # serve the build on port 4173
 ```
@@ -179,6 +207,9 @@ http://localhost:5173/?sleep=5#today
    changes.
 
 The NAS pulls. Nothing on the internet connects into the home network.
+
+A change to `deploy/api.py` needs the installer on the NAS. A static site pull
+does not reload the API process. See [deploy/README.md](deploy/README.md).
 
 ## Schedule rules
 

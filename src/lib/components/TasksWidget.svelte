@@ -5,7 +5,7 @@
   let items = $state([])
   let state = $state('loading')
 
-  const MAX_ITEMS = 7
+  const MAX_ITEMS = 6
 
   function normalize(raw) {
     const list = Array.isArray(raw) ? raw : raw && Array.isArray(raw.items) ? raw.items : []
@@ -38,12 +38,7 @@
   })
 </script>
 
-<section class="panel">
-  <header class="panel-head">
-    <h2>Tasks</h2>
-    <span class="panel-sub">{openCount} open</span>
-  </header>
-
+<div class="task-body">
   {#if visible.length > 0}
     <ul class="task-list">
       {#each visible as item, index (item.text + index)}
@@ -56,15 +51,15 @@
         </li>
       {/each}
     </ul>
-    {#if hidden > 0}
-      <div class="task-more">+{hidden} more</div>
-    {/if}
+    <div class="task-more">
+      {openCount} open{hidden > 0 ? ` · +${hidden} more` : ''}
+    </div>
   {:else if state === 'loading'}
-    <div class="empty"><span class="empty-title">Loading tasks</span></div>
+    <div class="empty small"><span class="empty-title">Loading tasks</span></div>
   {:else}
-    <div class="empty">
+    <div class="empty small">
       <span class="empty-title">No tasks</span>
       <span class="empty-hint">Add <code>/data/tasks.json</code> on the NAS.</span>
     </div>
   {/if}
-</section>
+</div>

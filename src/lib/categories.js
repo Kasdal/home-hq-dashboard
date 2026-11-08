@@ -13,7 +13,7 @@ export const CATEGORIES = [
 const RULES = [
   ['Dairy & Eggs', /milk|butter|cheese|yog|egg|cream|kerrygold|cheddar|fromage/],
   ['Bakery', /bread|bagel|bun\b|buns|wrap|pitta|croissant|roll|brennans|sourdough|baguette/],
-  ['Produce', /banana|apple|spud|potato|onion|carrot|tomato|lettuce|salad|orange|berr|avocado|pepper|cucumber|broccoli|mushroom|lemon|garlic|grape|spinach|fruit|veg\b/],
+  ['Produce', /banana|apple|spud|potato|onion|carrot|tomato|lettuce|salad|orange|berr|avocado|pepper|cucumber|broccoli|mushroom|lemon|garlic|grape|spinach|fruit|veg\b|cabbage|leek|celery|courgette|zucchini|pumpkin|beet|radish|parsley|basil|thyme|rosemary|herb/],
   ['Meat & Fish', /chicken|beef|pork|rasher|bacon|sausage|mince|salmon|fish|prawn|turkey|steak|ham\b|lamb/],
   ['Frozen', /frozen|ice cream|peas|chips|pizza/],
   ['Drinks', /juice|water|coke|cola|beer|wine|lemonade|soda|sparkling|kombucha/],

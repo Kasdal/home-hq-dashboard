@@ -7,6 +7,7 @@
     { id: 'today', label: 'Today' },
     { id: 'shopping', label: 'Shopping' },
     { id: 'cooking', label: 'Cooking' },
+    { id: 'plan', label: 'Plan' },
     { id: 'photos', label: 'Photos' },
     { id: 'controls', label: 'Controls' },
     { id: 'settings', label: 'Settings' },
@@ -41,6 +42,12 @@
               <path d="M7.2 10.2a3.1 3.1 0 0 1-1.1-6 4 4 0 0 1 7.6-1.1 3.6 3.6 0 0 1 4.2 5.2 3.1 3.1 0 0 1-1.1 5.9" />
               <path d="M7.2 10.2V19h9.6v-8.8" />
               <path d="M7.2 15h9.6" />
+            </svg>
+          {:else if item.id === 'plan'}
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="5.5" width="16" height="14" rx="2" />
+              <path d="M4 10h16M8 3.5v4M16 3.5v4" />
+              <path d="M8 14h3M8 17h6" />
             </svg>
           {:else if item.id === 'photos'}
             <svg viewBox="0 0 24 24" aria-hidden="true">

@@ -6,6 +6,7 @@ import { theme, initTheme, setThemeSchedule } from './lib/theme.svelte.js'
 import { initRoute } from './lib/route.svelte.js'
 import { startWeather } from './lib/weather.svelte.js'
 import { startShopping } from './lib/shopping.svelte.js'
+import { startPlan } from './lib/plan.svelte.js'
 import { startControls } from './lib/controls.svelte.js'
 import { startBins, bins } from './lib/bins.svelte.js'
 import { startPhotos } from './lib/photos.svelte.js'
@@ -18,6 +19,7 @@ initTheme()
 initRoute()
 startWeather()
 startShopping()
+startPlan()
 startControls()
 startBins()
 startPhotos()

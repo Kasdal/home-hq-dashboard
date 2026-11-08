@@ -1,5 +1,6 @@
 import { fetchJson } from './http.js'
 import { guessCategory, CATEGORIES } from './categories.js'
+import { ingredientToShopping } from './mealPlan.js'
 
 const API = '/api/shopping'
 const FILE = '/data/shopping.json'
@@ -204,6 +205,51 @@ export function addItem(name, options = {}) {
   shopping.items = [...shopping.items, item]
   touch()
   return item.id
+}
+
+// Add a recipe's ingredient lines to the shared list. The amount goes into
+// the note, so the shopper sees "500 g" under "minced meat". Items already on
+// the open list are skipped.
+export function addIngredients(lines, source = '') {
+  const list = Array.isArray(lines) ? lines : []
+  if (list.length === 0) return { added: 0, skipped: 0 }
+
+  const open = new Set(
+    shopping.items.filter((item) => !item.done).map((item) => item.name.toLowerCase())
+  )
+  const added = []
+  let skipped = 0
+
+  for (const line of list) {
+    const parsed = ingredientToShopping(line)
+    if (!parsed) continue
+    const key = parsed.name.toLowerCase()
+    if (open.has(key)) {
+      skipped += 1
+      continue
+    }
+    open.add(key)
+
+    let note = parsed.note
+    if (source) note = note ? `${note} · ${source}` : `For ${source}`
+
+    added.push({
+      id: newId(),
+      name: parsed.name,
+      note: note.slice(0, 120),
+      qty: 1,
+      category: guessCategory(parsed.name),
+      store: 'any',
+      done: false,
+    })
+  }
+
+  if (added.length > 0) {
+    shopping.items = [...shopping.items, ...added]
+    touch()
+  }
+
+  return { added: added.length, skipped }
 }
 
 export function toggleDone(id) {
