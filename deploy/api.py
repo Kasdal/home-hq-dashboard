@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """Minimal data API for the Home HQ dashboard.
 
-GET  /shopping  -> the current shopping list
-POST /shopping  -> replace the shopping list
-GET  /state     -> shared state (bin confirmations)
-POST /state     -> confirm one bin day
+GET    /shopping  -> the current shopping list
+POST   /shopping  -> replace the shopping list
+GET    /state     -> shared state (bin confirmations)
+POST   /state     -> confirm one bin day
+GET    /photos    -> uploaded photos in data/photos
+POST   /photos    -> upload one image, raw body, ?name=file.jpg
+DELETE /photos    -> remove one upload, ?name=file.jpg
 
 Files are written with a temporary file and os.replace, so a reader never sees
 a half-written document. Only the standard library is used.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -17,14 +21,19 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 SHOPPING_FILE = os.path.join(DATA_DIR, "shopping.json")
 STATE_FILE = os.path.join(DATA_DIR, "state.json")
+PHOTOS_DIR = os.path.join(DATA_DIR, "photos")
+INDEX_FILE = os.path.join(DATA_DIR, "photos-index.json")
 PORT = int(os.environ.get("PORT", "8099"))
 MAX_BODY = 128 * 1024
+MAX_UPLOAD = 20 * 1024 * 1024
 STATE_KEEP_DAYS = 60
+PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 LOCK = threading.Lock()
 
@@ -72,6 +81,153 @@ def read_doc(path, default):
         return doc
     except Exception:
         return dict(default)
+
+
+SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._ -]+")
+
+
+def image_extension(data):
+    if data[:3] == b"\xff\xd8\xff":
+        return ".jpg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return ".png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp"
+    return None
+
+
+def safe_stem(raw_name):
+    name = os.path.basename(str(raw_name or "").replace("\\", "/"))
+    stem = os.path.splitext(name)[0]
+    stem = SAFE_NAME_RE.sub("", stem).strip(" .-_")
+    stem = re.sub(r"[\s_]+", "-", stem)
+    return stem[:60] or "photo"
+
+
+def photo_caption(name):
+    stem = os.path.splitext(name)[0]
+    return stem.replace("_", " ").replace("-", " ").strip()[:80]
+
+
+def photo_src(name):
+    return "/data/photos/" + urllib.parse.quote(name)
+
+
+def patch_index(add=None, remove=None):
+    """Keep photos-index.json in step right after an upload or delete.
+
+    photos.py rebuilds the whole index from data/photos every 10 minutes, so
+    this is only a bridge for the time in between.
+    """
+    try:
+        with open(INDEX_FILE, encoding="utf-8-sig") as stream:
+            doc = json.load(stream)
+        if not isinstance(doc, dict):
+            doc = {}
+    except Exception:
+        doc = {}
+
+    photos = [p for p in doc.get("photos", []) if isinstance(p, dict)]
+    if remove:
+        target = photo_src(remove)
+        photos = [p for p in photos if p.get("src") != target]
+    if add:
+        target = photo_src(add)
+        photos = [p for p in photos if p.get("src") != target]
+        photos.insert(0, {"src": target, "caption": photo_caption(add)})
+
+    doc["photos"] = photos[:300]
+    doc.setdefault("source", "folder")
+    doc.setdefault("error", None)
+    doc.setdefault("hasAlbum", False)
+    doc.setdefault("cached", False)
+    doc.setdefault("albumTitle", "")
+    doc.setdefault("intervalSeconds", 20)
+    doc["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    write_doc(INDEX_FILE, doc)
+
+
+def save_upload(raw_name, data):
+    extension = image_extension(data)
+    if not extension:
+        raise ValueError("image must be JPEG, PNG or WebP")
+
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    stem = safe_stem(raw_name)
+    digest = hashlib.sha1(data).hexdigest()
+
+    name = stem + extension
+    path = os.path.join(PHOTOS_DIR, name)
+    for index in range(1, 51):
+        if not os.path.exists(path):
+            break
+        try:
+            with open(path, "rb") as stream:
+                same = hashlib.sha1(stream.read()).hexdigest() == digest
+        except OSError:
+            same = False
+        if same:
+            return name, True
+        name = "%s-%d%s" % (stem, index + 1, extension)
+        path = os.path.join(PHOTOS_DIR, name)
+    else:
+        raise ValueError("too many files with this name")
+
+    handle, temp_path = tempfile.mkstemp(dir=PHOTOS_DIR, prefix=".upload-", suffix=".tmp")
+    try:
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_path, path)
+        os.chmod(path, 0o644)
+    except Exception:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+    return name, False
+
+
+def list_uploads():
+    try:
+        names = os.listdir(PHOTOS_DIR)
+    except OSError:
+        return []
+
+    items = []
+    for name in names:
+        if os.path.splitext(name)[1].lower() not in PHOTO_EXTS:
+            continue
+        path = os.path.join(PHOTOS_DIR, name)
+        if not os.path.isfile(path):
+            continue
+        try:
+            stat = os.stat(path)
+        except OSError:
+            continue
+        items.append(
+            {
+                "name": name,
+                "size": stat.st_size,
+                "modified": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(stat.st_mtime)),
+                "url": photo_src(name),
+            }
+        )
+    items.sort(key=lambda item: item["modified"], reverse=True)
+    return items
+
+
+def delete_upload(raw_name):
+    name = os.path.basename(str(raw_name or "").replace("\\", "/"))
+    if not name or name != str(raw_name) or os.path.splitext(name)[1].lower() not in PHOTO_EXTS:
+        raise ValueError("bad file name")
+
+    path = os.path.join(PHOTOS_DIR, name)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(name)
+    os.remove(path)
 
 
 def validate_shopping(doc):
@@ -143,8 +299,12 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def request_path(self):
+        parsed = urllib.parse.urlparse(self.path)
+        return parsed.path.rstrip("/") or "/", urllib.parse.parse_qs(parsed.query)
+
     def do_GET(self):
-        path = self.path.rstrip("/")
+        path, _query = self.request_path()
 
         if path == "/health":
             self.send_json(200, {"ok": True})
@@ -160,15 +320,52 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, doc)
             return
 
+        if path == "/photos":
+            self.send_json(200, {"photos": list_uploads(), "maxBytes": MAX_UPLOAD})
+            return
+
         self.send_json(404, {"error": "not found"})
 
     def do_POST(self):
-        path = self.path.rstrip("/")
+        path, query = self.request_path()
 
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = 0
+
+        if path == "/photos":
+            if length <= 0:
+                self.send_json(413, {"error": "empty body"})
+                return
+            if length > MAX_UPLOAD:
+                self.send_json(413, {"error": "image is larger than 20 MB"})
+                return
+
+            data = self.rfile.read(length)
+            raw_name = (query.get("name") or ["photo"])[0]
+
+            with LOCK:
+                try:
+                    name, existed = save_upload(raw_name, data)
+                except ValueError as error:
+                    self.send_json(400, {"error": str(error)})
+                    return
+                except Exception as error:
+                    self.send_json(500, {"error": "write failed: %s" % type(error).__name__})
+                    return
+                try:
+                    patch_index(add=name)
+                except Exception as error:
+                    print("photos: index update failed: %s" % type(error).__name__, flush=True)
+
+            print(
+                "photos: %s %s (%d bytes)"
+                % ("kept" if existed else "saved", name, len(data)),
+                flush=True,
+            )
+            self.send_json(200, {"name": name, "existed": existed, "url": photo_src(name)})
+            return
 
         if length <= 0 or length > MAX_BODY:
             self.send_json(413, {"error": "body too large or empty"})
@@ -229,12 +426,40 @@ class Handler(BaseHTTPRequestHandler):
 
         self.send_json(404, {"error": "not found"})
 
+    def do_DELETE(self):
+        path, query = self.request_path()
+
+        if path == "/photos":
+            raw_name = (query.get("name") or [""])[0]
+            with LOCK:
+                try:
+                    delete_upload(raw_name)
+                except ValueError as error:
+                    self.send_json(400, {"error": str(error)})
+                    return
+                except FileNotFoundError:
+                    self.send_json(404, {"error": "no such photo"})
+                    return
+                except Exception as error:
+                    self.send_json(500, {"error": "delete failed: %s" % type(error).__name__})
+                    return
+                try:
+                    patch_index(remove=raw_name)
+                except Exception as error:
+                    print("photos: index update failed: %s" % type(error).__name__, flush=True)
+
+            print("photos: deleted %s" % raw_name, flush=True)
+            self.send_json(200, {"ok": True})
+            return
+
+        self.send_json(404, {"error": "not found"})
+
     def log_message(self, fmt, *args):
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
 
 def main():
-    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
     read_doc(SHOPPING_FILE, DEFAULT_SHOPPING)
     read_doc(STATE_FILE, DEFAULT_STATE)
     print("homehq api on port %d, data %s" % (PORT, DATA_DIR), flush=True)

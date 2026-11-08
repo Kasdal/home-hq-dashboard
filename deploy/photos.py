@@ -266,15 +266,15 @@ def main():
 
     folder_photos = local_photos()
 
+    # Uploads in data/photos come first, then the album cache. The upload page
+    # writes there, so a new photo shows without waiting for an album change.
+    photos = (folder_photos + cache_photos)[:MAX_PHOTOS]
     if cache_photos:
         source = "album"
-        photos = cache_photos
     elif folder_photos:
         source = "folder"
-        photos = folder_photos
     else:
         source = "none"
-        photos = []
 
     try:
         interval = int(config.get("intervalSeconds") or 20)

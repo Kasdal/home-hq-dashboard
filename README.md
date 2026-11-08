@@ -60,7 +60,9 @@ returns app-created albums, and the Picker API needs a person to select photos.
 The share-page importer is unofficial. It lives in `deploy/google_album.py`, so
 a format change touches one file.
 
-Fallback: put JPG, PNG or WebP files in `~/homehq/data/photos`. A shared Google
+Add photos from a PC with the drag-and-drop page at `http://<nas>:8088/upload/`.
+It saves JPEG, PNG and WebP files to `~/homehq/data/photos`, and they join the
+slideshow. You can also copy files into that folder directly. A shared Google
 Drive folder is more reliable than a Google Photos album, because Drive has an
 official API. See [deploy/README.md](deploy/README.md).
 

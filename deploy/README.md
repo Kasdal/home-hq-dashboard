@@ -27,7 +27,7 @@ Two containers run from a private Docker network named `homehq`:
 - `homehq-web`: `nginx:alpine`, published on port `8088`. It serves the site
   and proxies `/api/` to the API container.
 - `homehq-api`: `python:3-alpine`, no published port. It reads and writes
-  `data/shopping.json` for the shopping page.
+  `data/shopping.json`, the bin state, and photo uploads in `data/photos`.
 
 `~/homehq/data` is mounted read-only in the web container at `/sitedata` and
 read-write in the API container at `/data`. A deploy swaps the `current`
@@ -89,7 +89,7 @@ Put the private JSON files in `~/homehq/data`. The page requests them from
 | `state.json` | Bin confirmations, written by the API |
 | `controls.json` | `{"controls":[{"id":"lights","label":"Lights","url":"http://.../run","icon":"L"}]}` |
 | `nest.json` | Indoor temperature, written by `nest.py` |
-| `nest-credentials.json` | Nest login secrets, private, see below |
+| `nest-credentials.json` | Nest login secrets, in `~/.config/homehq`, see below |
 
 Keep `config.json` out of the public repository. It holds the home location.
 
@@ -190,11 +190,39 @@ Limits of this approach:
 - The image URLs are public while the album is shared.
 - Video items show as their still frame.
 
-#### Local folder fallback
+#### Upload from a PC
 
-Put JPG, PNG or WebP files in `~/homehq/data/photos`. Nested folders work. The
-index uses the folder only when the album cache is empty. Keep the files small:
-about 1600 pixels on the long side.
+Open this link in a browser on the home network:
+
+```text
+http://<nas-address>:8088/upload/
+```
+
+Drag photos onto the page, or choose files. The page sends each file to the API,
+and the API writes it to `~/homehq/data/photos`. JPEG, PNG and WebP are accepted,
+up to 20 MB each. The page lists the uploaded photos and can remove one.
+
+Uploads join the slideshow index immediately. `photos.py` rebuilds the index
+from `data/photos` plus the album cache every 10 minutes, so uploads stay after
+a rebuild. The frame reloads the index every 5 minutes.
+
+The API endpoints:
+
+```text
+GET    /api/photos        -> {"photos":[{name,size,modified,url}],"maxBytes":...}
+POST   /api/photos?name=  -> raw image body, one file per request
+DELETE /api/photos?name=  -> remove one uploaded file
+```
+
+Only LAN clients can reach these endpoints, because `nginx.conf` allows private
+address ranges only. There is no login. Any device on the home network can
+upload or remove a photo.
+
+#### Local folder
+
+Put JPG, PNG or WebP files in `~/homehq/data/photos`. Nested folders work.
+Uploaded files land in the same folder. Uploads show first, newest first, then
+the album cache. Keep the files small: about 1600 pixels on the long side.
 
 To sync a Windows folder to the NAS, use rclone:
 
@@ -252,8 +280,8 @@ It uses the unofficial Nest web API, the same one the Nest app uses. Google can
 change it at any time. This is not the official Device Access API and needs no
 $5 fee.
 
-Secrets live in `~/homehq/data/nest-credentials.json` with mode 600. Never
-commit it.
+Secrets live in `~/.config/homehq/nest-credentials.json` with mode 600. Never
+commit it, and never put it in `data/`: nginx serves that folder on the LAN.
 
 Google account, made or migrated after August 2019:
 
@@ -288,7 +316,9 @@ Legacy Nest account, not migrated to Google:
 Run it, then check the output and the log:
 
 ```bash
-chmod 600 ~/homehq/data/nest-credentials.json
+mkdir -p ~/.config/homehq
+chmod 700 ~/.config/homehq
+chmod 600 ~/.config/homehq/nest-credentials.json
 python3 ~/homehq/nest.py
 cat ~/homehq/data/nest.json
 tail -5 ~/homehq/nest.log
