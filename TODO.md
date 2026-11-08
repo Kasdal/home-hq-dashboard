@@ -12,7 +12,8 @@ Open work for the Home HQ dashboard. Keep secrets and private data out of this f
 - [x] **Automatic structure for uploaded recipes.** After OCR, the LLM extracts title, ingredients, steps and notes. All recipe types use the same single-column view. The raw OCR text and original file stay. A failed structure shows a retry button. `llm.autoStructure` turns it off.
 - [x] **Photo uploader.** Drag-and-drop page at `/upload/`. Saves JPEG, PNG and WebP files to `data/photos` through `POST /api/photos`. Uploads join the slideshow within about 10 minutes.
 - [x] **Meal plan.** `#plan` page with a seven-day list and recipe picker. The Today middle column shows a Tonight / Tasks tab. "Surprise me" favors warm food at 18 °C or cooler and light food over 18 °C. "Add ingredients" opens a review sheet. The parser strips leading and trailing amounts into the note. Uncheck items before the write. `data/plan.json` through `/api/plan`. Live on the NAS and checked on the frame. Starter plan: Pileća Pljeskavica and Chicken Bacon Ranch Smash & Scoop.
-- [ ] **Rain nowcast, cook mode, dates card.** Optional ideas with notes and costs. See `HANDOFF.md` section 16.
+- [x] **Rain nowcast.** The masthead and the sleep screen show "Rain now", "Rain at HH:MM" or "Dry for 6 hours". Open-Meteo 15-minute data, with the hourly chance as fallback. `scripts/check-rain.mjs` covers the rules.
+- [ ] **Cook mode and dates card.** Optional ideas with notes and costs. See `HANDOFF.md` section 16.
 - [ ] **Shopping merge.** Replace last-write-wins with a merge on conflict. Keep the current polling pause.
 
 ## Data safety

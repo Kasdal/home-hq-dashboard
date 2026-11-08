@@ -1,6 +1,16 @@
 import { fetchJson } from './http.js'
 import { loadConfig } from './config.js'
 import { describeWeather } from './weather.js'
+import { buildRainNowcast } from './rain.js'
+
+const EMPTY_RAIN = {
+  status: 'none',
+  state: '',
+  label: '',
+  at: '',
+  source: '',
+  inMinutes: null,
+}
 
 export const weather = $state({
   status: 'loading', // loading | ok | nolocation | offline
@@ -8,6 +18,7 @@ export const weather = $state({
   current: null,
   daily: null,
   hourly: [],
+  rain: EMPTY_RAIN,
   summary: '',
   updated: 0,
 })
@@ -112,7 +123,8 @@ export async function loadWeather() {
     'https://api.open-meteo.com/v1/forecast' +
     `?latitude=${config.latitude}&longitude=${config.longitude}` +
     '&current=temperature_2m,apparent_temperature,weather_code,is_day' +
-    '&hourly=temperature_2m,precipitation_probability,weather_code' +
+    '&minutely_15=precipitation,precipitation_probability' +
+    '&hourly=temperature_2m,precipitation,precipitation_probability,weather_code' +
     '&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset' +
     `&timezone=${encodeURIComponent(config.timezone || 'auto')}` +
     '&forecast_days=2'
@@ -122,6 +134,7 @@ export async function loadWeather() {
     weather.current = data.current
     weather.daily = data.daily
     weather.hourly = buildHourly(data)
+    weather.rain = buildRainNowcast(data, new Date())
     weather.summary = buildSummary(weather.hourly, data.current ? data.current.weather_code : 3)
     weather.updated = Date.now()
     weather.status = 'ok'

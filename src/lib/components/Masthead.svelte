@@ -48,6 +48,9 @@
         <div class="mast-wxtext">
           <div class="mast-cond">{cond.label}</div>
           <div class="mast-range">H {high}°&nbsp;&nbsp;L {low}°</div>
+          {#if weather.rain && weather.rain.label}
+            <div class="mast-rain">{weather.rain.label}</div>
+          {/if}
         </div>
       </div>
 

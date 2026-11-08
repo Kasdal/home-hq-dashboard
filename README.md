@@ -29,7 +29,7 @@ The navigation rail uses hash routes: `#today`, `#shopping`, `#cooking`,
 
 | Widget | Source |
 | --- | --- |
-| Clock and weather | Device clock, Open-Meteo (no API key), hourly strip |
+| Clock and weather | Device clock, Open-Meteo (no API key), hourly strip, rain nowcast |
 | Garbage bins | Thursday schedule from `/data/bins.json`, with bin-day alert |
 | Shopping | `/data/shopping.json` through `/api/shopping` |
 | Tasks | `/data/tasks.json` |
@@ -41,6 +41,11 @@ The navigation rail uses hash routes: `#today`, `#shopping`, `#cooking`,
 
 Private data comes from the NAS at runtime. The repository stays public and
 holds no secrets, home address or location.
+
+The weather block also shows a rain nowcast: "Rain now", "Rain at 15:30" or
+"Dry for 6 hours". It uses the Open-Meteo 15-minute precipitation series and
+falls back to the hourly chance when the series is absent. The same label
+appears on the sleep screen.
 
 ## Theme
 

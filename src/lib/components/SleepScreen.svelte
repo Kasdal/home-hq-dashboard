@@ -90,9 +90,14 @@
     {#if temp !== null}
       <div class="sleep-wx">
         <div class="sleep-temp">{temp}<span class="sleep-deg">°</span></div>
-        <div class="sleep-cond">
-          <WeatherGlyph code={code} night={night} size={34} />
-          <span>{warmth(temp)} · {cond.label}</span>
+        <div class="sleep-meta">
+          <div class="sleep-cond">
+            <WeatherGlyph code={code} night={night} size={34} />
+            <span>{warmth(temp)} · {cond.label}</span>
+          </div>
+          {#if weather.rain && weather.rain.label}
+            <div class="sleep-rain">{weather.rain.label}</div>
+          {/if}
         </div>
       </div>
     {/if}
