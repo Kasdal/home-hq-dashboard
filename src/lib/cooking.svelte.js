@@ -23,7 +23,14 @@ function asText(value, max) {
 }
 
 function buildSearch(recipe) {
-  return [recipe.title, (recipe.tags || []).join(' '), recipe.notes, recipe.text]
+  return [
+    recipe.title,
+    (recipe.tags || []).join(' '),
+    (recipe.ingredients || []).join(' '),
+    (recipe.steps || []).join(' '),
+    recipe.notes,
+    recipe.text,
+  ]
     .join(' ')
     .toLowerCase()
 }
@@ -36,15 +43,23 @@ export function normalizeRecipe(raw) {
   const tags = Array.isArray(raw.tags)
     ? raw.tags.map((tag) => asText(tag, 30).trim()).filter(Boolean).slice(0, 20)
     : []
+  const ingredients = Array.isArray(raw.ingredients)
+    ? raw.ingredients.map((item) => asText(item, 200).trim()).filter(Boolean).slice(0, 100)
+    : []
+  const steps = Array.isArray(raw.steps)
+    ? raw.steps.map((item) => asText(item, 1000).trim()).filter(Boolean).slice(0, 100)
+    : []
 
   const recipe = {
     id,
     title: asText(raw.title, 120).trim() || 'Untitled recipe',
     tags,
     notes: asText(raw.notes, 2000),
+    ingredients,
+    steps,
     text: asText(raw.text, MAX_TEXT),
     file: asText(raw.file, 200),
-    type: ['image', 'pdf', 'text'].includes(raw.type) ? raw.type : 'text',
+    type: ['image', 'pdf', 'text', 'manual'].includes(raw.type) ? raw.type : 'text',
     mime: asText(raw.mime, 100),
     size: Number(raw.size) || 0,
     addedAt: asText(raw.addedAt, 30),
@@ -140,6 +155,12 @@ export async function saveRecipe(id, patch) {
     title: current.title,
     tags: [...current.tags],
     notes: current.notes,
+    ingredients: [...current.ingredients],
+    steps: [...current.steps],
+    file: current.file,
+    thumb: current.thumb,
+    size: current.size,
+    mime: current.mime,
   }
 
   const updated = { ...current, ...patch }
@@ -150,12 +171,22 @@ export async function saveRecipe(id, patch) {
   cooking.saving = true
 
   try {
-    const slim = cooking.recipes.map((recipe) => ({
-      id: recipe.id,
-      title: recipe.title,
-      tags: recipe.tags,
-      notes: recipe.notes,
-    }))
+    const slim = cooking.recipes.map((recipe) => {
+      const item = {
+        id: recipe.id,
+        title: recipe.title,
+        tags: recipe.tags,
+        notes: recipe.notes,
+      }
+      if (recipe.type === 'manual') {
+        item.ingredients = recipe.ingredients
+        item.steps = recipe.steps
+      }
+      if (recipe.id === id && Object.prototype.hasOwnProperty.call(patch, 'photo')) {
+        item.photo = patch.photo
+      }
+      return item
+    })
     const response = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -192,6 +223,85 @@ export async function deleteRecipe(id) {
   } catch {
     showToast('Could not remove the recipe')
     return false
+  }
+}
+
+export function uploadRecipeFile(file, onProgress) {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/photos?kind=recipe-file&name=' + encodeURIComponent(file.name))
+    xhr.responseType = 'json'
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress(Math.round((event.loaded / event.total) * 100))
+      }
+    }
+
+    xhr.onload = () => {
+      const body = xhr.response || {}
+      if (xhr.status === 200 && body.photo) {
+        resolve({ ok: true, photo: body.photo })
+        return
+      }
+      resolve({
+        ok: false,
+        error: body.error || 'Photo upload failed (' + xhr.status + ')',
+      })
+    }
+
+    xhr.onerror = () => resolve({ ok: false, error: 'Network error' })
+    xhr.send(file)
+  })
+}
+
+export async function parseManualText(text) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 180000)
+
+  try {
+    const response = await fetch('/api/recipes/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      return { ok: false, error: body.error || 'AI parse failed' }
+    }
+    return { ok: true, data: body }
+  } catch {
+    return { ok: false, error: 'AI parse failed' }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export async function createManualRecipe(payload) {
+  try {
+    const response = await fetch('/api/recipes/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      return { ok: false, error: body.error || 'Could not save the recipe' }
+    }
+
+    const recipe = normalizeRecipe(body.recipe)
+    if (!recipe) return { ok: false, error: 'Bad recipe response' }
+
+    cooking.recipes = sortRecipes([
+      recipe,
+      ...cooking.recipes.filter((item) => item.id !== recipe.id),
+    ])
+    cooking.query = ''
+    showToast('Recipe added')
+    return { ok: true, recipe }
+  } catch {
+    return { ok: false, error: 'Could not save the recipe' }
   }
 }
 

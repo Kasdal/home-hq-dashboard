@@ -11,14 +11,18 @@
     removeUpload,
     uploadRecipe,
   } from '../cooking.svelte.js'
+  import { loadConfig } from '../config.js'
   import RecipeView from './RecipeView.svelte'
+  import ManualRecipeForm from './ManualRecipeForm.svelte'
 
   let searchText = $state(cooking.query)
   let searchTimer = null
   let queueTimer = null
-  let fileInput = null
+  let fileInput = $state(null)
   let dragDepth = 0
   let dragging = $state(false)
+  let manualOpen = $state(false)
+  let llmEnabled = $state(true)
 
   const filtered = $derived(filteredRecipes())
   const countLabel = $derived(cooking.recipes.length === 1 ? 'recipe' : 'recipes')
@@ -27,6 +31,9 @@
   onMount(() => {
     startCooking()
     searchText = cooking.query
+    loadConfig().then((config) => {
+      llmEnabled = !config.llm || config.llm.enabled !== false
+    })
     return () => {
       stopCooking()
       clearTimeout(searchTimer)
@@ -119,7 +126,14 @@
   }
 
   function meta(recipe) {
-    const kind = recipe.type === 'pdf' ? 'PDF' : recipe.type === 'text' ? 'Text' : 'Image'
+    const kind =
+      recipe.type === 'pdf'
+        ? 'PDF'
+        : recipe.type === 'manual'
+          ? 'Manual'
+          : recipe.type === 'text'
+            ? 'Text'
+            : 'Image'
     return kind + ' · Added ' + shortDate(recipe.addedAt)
   }
 </script>
@@ -143,7 +157,12 @@
         <span class="cook-count"><b>{cooking.recipes.length}</b> {countLabel}</span>
       </div>
     </div>
-    <button class="cook-add" type="button" onclick={pickFiles}>+ Add recipe</button>
+    <div class="cook-head-actions">
+      {#if llmEnabled}
+        <button class="cook-paste" type="button" onclick={() => (manualOpen = true)}>Paste recipe</button>
+      {/if}
+      <button class="cook-add" type="button" onclick={pickFiles}>+ Add recipe</button>
+    </div>
   </header>
 
   <div class="cook-search">
@@ -189,7 +208,13 @@
                     <path d="M7 3h7l4 4v14H7z" />
                     <path d="M14 3v4h4" />
                   </svg>
-                  <b>{recipe.type === 'pdf' ? 'PDF' : 'TXT'}</b>
+                  <b>
+                    {recipe.type === 'pdf'
+                      ? 'PDF'
+                      : recipe.type === 'manual'
+                        ? 'MANUAL'
+                        : 'TXT'}
+                  </b>
                 </span>
               {/if}
             </span>
@@ -211,7 +236,7 @@
     {:else}
       <div class="cook-empty">
         <span class="cook-empty-title">Drop a recipe here to get started</span>
-        <span class="cook-empty-hint">Images, PDFs, text or Markdown. Or use + Add recipe.</span>
+        <span class="cook-empty-hint">Drop a file, or paste any recipe with the AI button.</span>
         {#if cooking.error}
           <span class="cook-empty-hint">Could not reach the recipe store. Check the NAS.</span>
         {/if}
@@ -263,6 +288,10 @@
 
   {#if dragging}
     <div class="cook-drop"><span>Drop to add a recipe</span></div>
+  {/if}
+
+  {#if manualOpen}
+    <ManualRecipeForm onclose={() => (manualOpen = false)} />
   {/if}
 
   {#if route.recipeId}

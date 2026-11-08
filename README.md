@@ -82,6 +82,14 @@ characters. The API image needs about 100 MB extra for the tools. Edit the
 title, tags and notes in the recipe view. Delete removes the entry, file and
 thumbnail.
 
+The page also has a "Paste recipe" form. Paste any recipe text up to 4,000
+characters, add an optional photo and tags, then press `Dodaj uz pomoc AI
+modela`. A local Qwen2.5 1.5B model reads the title, ingredients and steps. The
+result appears as an editable preview. Save uploads the photo and creates the
+manual recipe. The model runs on the NAS and unloads after two idle minutes. A
+normal recipe takes about 20 seconds. The model uses about 1.5-2 GB RAM during
+a parse. Set `llm.enabled` to false in `/data/config.json` to turn it off.
+
 The recipe file lives in `~/homehq/data/recipes/files`. The page works on the
 frame and on a PC. Android WebView cannot show PDFs, so the frame shows the
 extracted text instead.

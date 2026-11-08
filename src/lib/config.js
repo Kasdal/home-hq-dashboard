@@ -17,6 +17,9 @@ export const DEFAULTS = {
     lightStart: '06:00',
     darkStart: '18:00',
   },
+  llm: {
+    enabled: true,
+  },
 }
 
 let cached = null
@@ -30,9 +33,15 @@ export async function loadConfig() {
       ...data,
       cat: { ...DEFAULTS.cat, ...(data.cat || {}) },
       theme: { ...DEFAULTS.theme, ...(data.theme || {}) },
+      llm: { ...DEFAULTS.llm, ...(data.llm || {}) },
     }
   } catch {
-    cached = { ...DEFAULTS, cat: { ...DEFAULTS.cat }, theme: { ...DEFAULTS.theme } }
+    cached = {
+      ...DEFAULTS,
+      cat: { ...DEFAULTS.cat },
+      theme: { ...DEFAULTS.theme },
+      llm: { ...DEFAULTS.llm },
+    }
   }
   return cached
 }

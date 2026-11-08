@@ -30,6 +30,8 @@ Two containers run from a private Docker network named `homehq`:
   published port. It serves shopping, bin state, photo uploads and recipes.
   The image adds Tesseract, Poppler, Pillow and Liberation fonts for recipe
   text extraction and PDF thumbnails.
+- `homehq-llm`: `ollama/ollama`, no published port. It runs Qwen2.5 1.5B for
+  the manual recipe parser. The model unloads after two idle minutes.
 
 `~/homehq/data` is mounted read-only in the web container at `/sitedata` and
 read-write in the API container at `/data`. A deploy swaps the `current`
@@ -51,6 +53,7 @@ The installer does these things:
 - Builds the `homehq-api:local` image with Tesseract, Poppler, Pillow and
   Liberation fonts.
 - Starts the API container.
+- Starts the `homehq-llm` container and pulls Qwen2.5 1.5B once.
 - Starts `nginx:alpine` as `homehq-web` on port `8088`.
 - Adds a crontab entry that runs `pull.sh` every 5 minutes and `photos.py`
   every 10 minutes.
@@ -59,7 +62,8 @@ The installer does these things:
 Run it again after a change to `nginx.conf`, `pull.sh`, `api.py`,
 `photos.py` or `Dockerfile.api`. The containers are replaced, and the cron
 entries are not duplicated. The first image build takes a few minutes. Later
-builds use the cached layers.
+builds use the cached layers. The first model pull is about 1 GB. Later runs
+reuse the model volume.
 
 ## Port
 
@@ -76,6 +80,8 @@ docker ps --filter name=homehq
 curl -I http://127.0.0.1:8088/
 curl http://127.0.0.1:8088/version.json
 curl http://127.0.0.1:8088/api/shopping
+curl http://127.0.0.1:8088/api/recipes
+docker exec homehq-llm ollama list
 tail -f ~/homehq/pull.log
 ```
 
@@ -300,15 +306,53 @@ finishes.
 Endpoints:
 
 ```text
-POST   /api/photos?kind=recipe&name=  -> raw file body, creates a recipe
-GET    /api/recipes                   -> {"rev":...,"recipes":[...]}
-POST   /api/recipes                   -> update titles, tags and notes
-DELETE /api/recipes?id=               -> remove the entry, file and thumbnail
+POST   /api/photos?kind=recipe&name=      -> raw file body, creates a recipe
+POST   /api/photos?kind=recipe-file&name= -> upload a photo only
+POST   /api/recipes/parse                 -> parse free text with the local LLM
+POST   /api/recipes/manual                -> create a manual recipe
+GET    /api/recipes                       -> {"rev":...,"recipes":[...]}
+POST   /api/recipes                       -> update fields and replace a photo
+DELETE /api/recipes?id=                   -> remove the entry, file and thumbnail
 ```
 
 `POST /api/recipes` takes only the editable fields. The server keeps the file
 and text fields from its own copy. The last write wins for title, tags and
 notes.
+
+#### Manual recipes and the local LLM
+
+The Cooking page has a "Paste recipe" button. It opens a form with a large text
+area, an optional photo and tags. Paste any recipe text up to 4,000 characters.
+The text can come from any web page or note.
+
+The button `Dodaj uz pomoc AI modela` sends the text to the local LLM. The API
+asks for a JSON object with `title`, `ingredients`, `steps` and `notes`. The
+model runs with a JSON schema, temperature 0, 3 threads and a 4,096 token
+context. A normal recipe takes about 20 seconds.
+
+The response fills an editable preview. The user fixes any mistake, then saves.
+The save uploads the photo (if any) through `kind=recipe-file`, then creates the
+manual recipe. The photo upload does not create a recipe by itself.
+
+A manual entry has `type: "manual"`, `ingredients` and `steps` arrays, an
+optional photo, and a formatted `text` for search. The recipe view uses a
+single column: photo, title, meta, tags, Ingredients, Preparation, Notes.
+
+The model is Qwen2.5 1.5B Q4. The `homehq-llm` container has no published port.
+The model loads on the first parse, and unloads after two idle minutes. Idle RAM
+for the container is about 100-200 MB. A parse uses about 1.5-2 GB RAM and all
+four CPU cores for about 20 seconds. Use `LLM_THREADS=3` in the API to leave one
+core free. The first run pulls about 1 GB. The model volume is
+`~/homehq/llm`.
+
+If the parse fails, the add fails. The form keeps the text and shows an error.
+The user can retry. There is no silent fallback to Notes. The `llm.enabled`
+setting in `/data/config.json` turns the feature off. The page hides the button,
+and the API returns 503.
+
+The parse endpoint has a 180 second timeout in nginx. A 4,000 character paste
+takes longer than the normal 15 second API timeout, so it has its own location
+block.
 
 The recipe view shows images directly. It shows PDFs in an `<object>` on a PC.
 On the Android WebView the PDF object does not work, so the page hides the
@@ -428,8 +472,8 @@ mv -Tf ~/homehq/current.new ~/homehq/current
 ## Stop
 
 ```bash
-docker stop homehq-web homehq-api
-docker rm homehq-web homehq-api
+docker stop homehq-web homehq-api homehq-llm
+docker rm homehq-web homehq-api homehq-llm
 crontab -e   # remove the pull.sh and photos.py lines
 ```
 

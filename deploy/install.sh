@@ -8,6 +8,7 @@ BASE="${HOME}/homehq"
 PORT="${PORT:-8088}"
 CONTAINER="homehq-web"
 API="homehq-api"
+LLM="homehq-llm"
 NETWORK="homehq"
 REPO_URL="https://github.com/Kasdal/home-hq-dashboard.git"
 
@@ -15,6 +16,7 @@ echo "Base directory: ${BASE}"
 
 mkdir -p "${BASE}/releases/bootstrap" "${BASE}/data/photos" "${BASE}/data/photo-cache"
 mkdir -p "${BASE}/data/recipes/files" "${BASE}/data/recipes/thumbs" "${BASE}/.build"
+mkdir -p "${BASE}/llm"
 
 install -m 644 "${HERE}/nginx.conf" "${BASE}/nginx.conf"
 install -m 755 "${HERE}/pull.sh" "${BASE}/pull.sh"
@@ -109,6 +111,25 @@ docker run -d \
     -v "${BASE}/data:/data" \
     homehq-api:local python3 /api/api.py
 
+# Local LLM for manual recipe parsing. No published port. The model unloads
+# after two idle minutes, so RAM is free between parses.
+docker rm -f "${LLM}" >/dev/null 2>&1 || true
+docker run -d \
+    --name "${LLM}" \
+    --restart unless-stopped \
+    --network "${NETWORK}" \
+    -v "${BASE}/llm:/root/.ollama" \
+    ollama/ollama
+
+for _ in $(seq 1 30); do
+    if docker exec "${LLM}" ollama list >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+echo "Pulling the recipe model (about 1 GB, first run only)..."
+docker exec "${LLM}" ollama pull qwen2.5:1.5b
+
 # Start or replace the web container.
 docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
 docker run -d \
@@ -147,5 +168,6 @@ fi
 sleep 2
 docker ps --filter "name=${CONTAINER}"
 docker ps --filter "name=${API}"
+docker ps --filter "name=${LLM}"
 curl -sS -o /dev/null -w "HTTP %{http_code} on port ${PORT}\n" "http://127.0.0.1:${PORT}/"
 curl -sS -o /dev/null -w "API %{http_code}\n" "http://127.0.0.1:${PORT}/api/health"
