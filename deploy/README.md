@@ -308,7 +308,9 @@ Text extraction runs in a background worker in the API container:
 
 After the text is ready, a second worker sends up to 4,000 characters to the
 same local LLM. It stores `ingredients`, `steps` and `notes`, and sets
-`structureStatus` to `ready` or `failed`. The full OCR text stays in `text`.
+`structureStatus` to `ready` or `failed`. The prompt keeps quantities, uses
+metric units only, and puts calories and macros in Notes. The full OCR text
+stays in `text`.
 The background worker runs one parse at a time. A manual parse has priority
 over queued background work. The structure step uses the same Qwen2.5 model.
 
@@ -342,7 +344,9 @@ The text can come from any web page or note.
 The button `Dodaj uz pomoc AI modela` sends the text to the local LLM. The API
 asks for a JSON object with `title`, `ingredients`, `steps` and `notes`. The
 model runs with a JSON schema, temperature 0, 3 threads and a 4,096 token
-context. A normal recipe takes about 20 seconds.
+context. A normal recipe takes about 20 seconds. The prompt keeps the full
+ingredient quantity and unit, converts to metric units only, and puts calories,
+macros and servings in Notes.
 
 The response fills an editable preview. The user fixes any mistake, then saves.
 The save uploads the photo (if any) through `kind=recipe-file`, then creates the
