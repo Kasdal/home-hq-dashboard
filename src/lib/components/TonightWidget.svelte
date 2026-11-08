@@ -7,13 +7,16 @@
     todayKey,
     dayKey,
     surpriseMe,
-    addMealIngredients,
+    previewMealIngredients,
     clearMeal,
     climateInfo,
   } from '../plan.svelte.js'
+  import { addIngredientItems } from '../shopping.svelte.js'
+  import IngredientReview from './IngredientReview.svelte'
 
   let message = $state('')
   let messageTimer = null
+  let review = $state(null)
 
   const today = $derived(todayKey())
   const entry = $derived(plan.days[today] || null)
@@ -43,11 +46,26 @@
   }
 
   function add() {
-    const result = addMealIngredients(today)
+    const result = previewMealIngredients(today)
     if (result.error) {
       showMessage(result.error === 'No ingredients' ? 'This recipe has no ingredients.' : result.error)
       return
     }
+    if (result.items.length === 0) {
+      showMessage('Nothing to add.')
+      return
+    }
+    if (!result.items.some((item) => !item.exists)) {
+      showMessage('All ingredients are already on the list.')
+      return
+    }
+    review = { title: result.recipe.title, items: result.items }
+  }
+
+  function confirm(items) {
+    const source = review ? review.title : ''
+    const result = addIngredientItems(items, source)
+    review = null
     if (result.added === 0 && result.skipped === 0) {
       showMessage('Nothing to add.')
       return
@@ -177,3 +195,12 @@
     </div>
   {/if}
 </div>
+
+{#if review}
+  <IngredientReview
+    title={review.title}
+    items={review.items}
+    onclose={() => (review = null)}
+    onconfirm={confirm}
+  />
+{/if}

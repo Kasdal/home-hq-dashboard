@@ -121,10 +121,11 @@ A day at 18 °C or cooler favors soups, stews, roasts and baked dishes. With no
 match, the pick is random. The pick avoids the current meal and the previous
 day's meal when it can.
 
-"Add ingredients" writes the recipe ingredients to the shared shopping list.
-The amount goes into the note, for example "500 g · Sarma". Items already on
-the open list are skipped. The same action is in the recipe view as "Add to
-shopping".
+"Add ingredients" opens a review sheet. The sheet shows the product name and
+the amount. The parser strips the amount from the start or the end and moves it
+into the note, for example `500 g · Sarma`. Uncheck anything you do not need.
+`Add N items` writes the selection. The sheet disables items that are already
+on the open list. The same action is in the recipe view as "Add to shopping".
 
 The Today page shows tonight's meal in the middle column. The Tasks tab sits
 next to it. The Tonight card shows the meal, the climate hint, Add ingredients

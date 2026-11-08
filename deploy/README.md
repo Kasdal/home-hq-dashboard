@@ -506,9 +506,14 @@ POST /api/plan  -> replace the plan
 
 "Surprise me" uses the current temperature from the weather block. Over 18 °C
 is a warm day and favors light dishes. At 18 °C or cooler it favors warm
-dishes. "Add ingredients" writes the recipe lines to `shopping.json` through
-the same browser store. The note keeps the amount and the recipe title. Open
-list items are skipped.
+dishes.
+
+"Add ingredients" opens a review sheet. The parser strips the amount from the
+start or the end of each line and moves it into the note. The sheet shows the
+product name and the amount. Uncheck anything you do not need. `Add N items`
+writes the selection to `shopping.json` through the browser store. The note
+keeps the amount and the recipe title. The sheet disables items already on the
+open list.
 
 The Today middle column has a Tonight / Tasks tab. Tonight reads the same
 `/api/plan` document.

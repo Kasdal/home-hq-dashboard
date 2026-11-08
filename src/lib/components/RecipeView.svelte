@@ -9,8 +9,9 @@
     retryStructure,
     showToast,
   } from '../cooking.svelte.js'
-  import { addIngredients } from '../shopping.svelte.js'
+  import { previewIngredients, addIngredientItems } from '../shopping.svelte.js'
   import { go } from '../route.svelte.js'
+  import IngredientReview from './IngredientReview.svelte'
 
   let { id } = $props()
 
@@ -31,6 +32,7 @@
   let photoPreview = $state('')
   let photoProgress = $state(0)
   let photoInput = $state(null)
+  let review = $state(null)
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -216,7 +218,22 @@
 
   function addToList() {
     if (!recipe) return
-    const result = addIngredients(recipe.ingredients, recipe.title)
+    const items = previewIngredients(recipe.ingredients)
+    if (items.length === 0) {
+      showToast('Nothing to add')
+      return
+    }
+    if (!items.some((item) => !item.exists)) {
+      showToast('All ingredients are already on the shopping list')
+      return
+    }
+    review = { title: recipe.title, items }
+  }
+
+  function confirm(items) {
+    const source = review ? review.title : ''
+    const result = addIngredientItems(items, source)
+    review = null
     if (result.added === 0 && result.skipped === 0) {
       showToast('Nothing to add')
       return
@@ -469,4 +486,13 @@
       </article>
     {/if}
   </div>
+{/if}
+
+{#if review}
+  <IngredientReview
+    title={review.title}
+    items={review.items}
+    onclose={() => (review = null)}
+    onconfirm={confirm}
+  />
 {/if}

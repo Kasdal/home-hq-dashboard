@@ -3,7 +3,7 @@ import { clock } from './clock.svelte.js'
 import { ymd } from './time.js'
 import { cooking } from './cooking.svelte.js'
 import { weather } from './weather.svelte.js'
-import { addIngredients } from './shopping.svelte.js'
+import { previewIngredients } from './shopping.svelte.js'
 import { pickSurpriseRecipe, climateFor, climateLabel } from './mealPlan.js'
 
 const API = '/api/plan'
@@ -119,13 +119,13 @@ export function clearMeal(key) {
   touch()
 }
 
-export function addMealIngredients(key) {
+export function previewMealIngredients(key) {
   const recipe = recipeFor(key)
-  if (!recipe) return { added: 0, skipped: 0, error: 'Recipe not found' }
+  if (!recipe) return { error: 'Recipe not found' }
   if (!recipe.ingredients || recipe.ingredients.length === 0) {
-    return { added: 0, skipped: 0, error: 'No ingredients' }
+    return { error: 'No ingredients' }
   }
-  return addIngredients(recipe.ingredients, recipe.title)
+  return { recipe, items: previewIngredients(recipe.ingredients) }
 }
 
 export function surpriseMe(key, options = {}) {

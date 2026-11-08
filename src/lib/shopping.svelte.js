@@ -207,11 +207,33 @@ export function addItem(name, options = {}) {
   return item.id
 }
 
-// Add a recipe's ingredient lines to the shared list. The amount goes into
-// the note, so the shopper sees "500 g" under "minced meat". Items already on
-// the open list are skipped.
-export function addIngredients(lines, source = '') {
+// Parse a recipe's ingredient lines into shopping items without writing them.
+// Each item carries an `exists` flag when the open list already has that name.
+export function previewIngredients(lines) {
   const list = Array.isArray(lines) ? lines : []
+  const open = new Set(
+    shopping.items.filter((item) => !item.done).map((item) => item.name.toLowerCase())
+  )
+  const seen = new Set()
+  const items = []
+
+  for (const line of list) {
+    const parsed = ingredientToShopping(line)
+    if (!parsed) continue
+    const key = parsed.name.toLowerCase()
+    const exists = open.has(key) || seen.has(key)
+    seen.add(key)
+    items.push({ ...parsed, exists })
+  }
+
+  return items
+}
+
+// Add previewed items to the shared list. The amount goes into the note, so
+// the shopper sees "500 g" under "minced meat". Items already on the open list
+// are skipped.
+export function addIngredientItems(items, source = '') {
+  const list = Array.isArray(items) ? items : []
   if (list.length === 0) return { added: 0, skipped: 0 }
 
   const open = new Set(
@@ -220,25 +242,24 @@ export function addIngredients(lines, source = '') {
   const added = []
   let skipped = 0
 
-  for (const line of list) {
-    const parsed = ingredientToShopping(line)
-    if (!parsed) continue
-    const key = parsed.name.toLowerCase()
+  for (const item of list) {
+    if (!item || !item.name) continue
+    const key = item.name.toLowerCase()
     if (open.has(key)) {
       skipped += 1
       continue
     }
     open.add(key)
 
-    let note = parsed.note
+    let note = item.note || ''
     if (source) note = note ? `${note} · ${source}` : `For ${source}`
 
     added.push({
       id: newId(),
-      name: parsed.name,
+      name: item.name,
       note: note.slice(0, 120),
       qty: 1,
-      category: guessCategory(parsed.name),
+      category: guessCategory(item.name),
       store: 'any',
       done: false,
     })
@@ -250,6 +271,10 @@ export function addIngredients(lines, source = '') {
   }
 
   return { added: added.length, skipped }
+}
+
+export function addIngredients(lines, source = '') {
+  return addIngredientItems(previewIngredients(lines), source)
 }
 
 export function toggleDone(id) {

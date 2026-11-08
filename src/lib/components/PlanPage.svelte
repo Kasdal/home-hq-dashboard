@@ -14,16 +14,19 @@
     setMeal,
     clearMeal,
     surpriseMe,
-    addMealIngredients,
+    previewMealIngredients,
     climateInfo,
   } from '../plan.svelte.js'
   import { planDates } from '../mealPlan.js'
   import { cooking, startCooking, stopCooking } from '../cooking.svelte.js'
+  import { addIngredientItems } from '../shopping.svelte.js'
+  import IngredientReview from './IngredientReview.svelte'
 
   let selected = $state(ymd(clock.now))
   let query = $state('')
   let toast = $state('')
   let toastTimer = null
+  let review = $state(null)
 
   const today = $derived(ymd(clock.now))
   const days = $derived(planDates(parseYmd(today), 7))
@@ -108,11 +111,26 @@
   }
 
   function add(key = selected) {
-    const result = addMealIngredients(key)
+    const result = previewMealIngredients(key)
     if (result.error) {
       showToast(result.error === 'No ingredients' ? 'This recipe has no ingredients.' : result.error)
       return
     }
+    if (result.items.length === 0) {
+      showToast('Nothing to add.')
+      return
+    }
+    if (!result.items.some((item) => !item.exists)) {
+      showToast('All ingredients are already on the shopping list.')
+      return
+    }
+    review = { title: result.recipe.title, items: result.items }
+  }
+
+  function confirm(items) {
+    const source = review ? review.title : ''
+    const result = addIngredientItems(items, source)
+    review = null
     if (result.added === 0 && result.skipped === 0) {
       showToast('Nothing to add.')
       return
@@ -314,3 +332,12 @@
     <div class="toast"><span>{toast}</span></div>
   {/if}
 </div>
+
+{#if review}
+  <IngredientReview
+    title={review.title}
+    items={review.items}
+    onclose={() => (review = null)}
+    onconfirm={confirm}
+  />
+{/if}
