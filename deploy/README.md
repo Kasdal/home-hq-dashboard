@@ -28,7 +28,8 @@ Two containers run from a private Docker network named `homehq`:
   and proxies `/api/` to the API container.
 - `homehq-api`: custom image `homehq-api:local` from `Dockerfile.api`, no
   published port. It serves shopping, bin state, photo uploads and recipes.
-  The image adds Tesseract, Poppler and Pillow for recipe text extraction.
+  The image adds Tesseract, Poppler, Pillow and Liberation fonts for recipe
+  text extraction and PDF thumbnails.
 
 `~/homehq/data` is mounted read-only in the web container at `/sitedata` and
 read-write in the API container at `/data`. A deploy swaps the `current`
@@ -47,7 +48,8 @@ The installer does these things:
 
 - Creates the directories, the placeholder page and a sample shopping list.
 - Creates the `homehq` Docker network.
-- Builds the `homehq-api:local` image with Tesseract, Poppler and Pillow.
+- Builds the `homehq-api:local` image with Tesseract, Poppler, Pillow and
+  Liberation fonts.
 - Starts the API container.
 - Starts `nginx:alpine` as `homehq-web` on port `8088`.
 - Adds a crontab entry that runs `pull.sh` every 5 minutes and `photos.py`
