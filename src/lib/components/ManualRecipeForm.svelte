@@ -224,7 +224,7 @@
       </button>
 
       {#if parsing}
-        <p class="cook-manual-hint">This takes about 20 seconds on the NAS. Keep this page open.</p>
+        <p class="cook-manual-hint">This can take up to a minute on the NAS. Keep this page open.</p>
       {/if}
       {#if saving && photoProgress > 0 && photoProgress < 100}
         <p class="cook-manual-hint">Uploading the photo... {photoProgress}%</p>

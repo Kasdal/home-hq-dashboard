@@ -768,7 +768,9 @@ def clean_string_list(value, max_items, max_length):
 
     result = []
     for item in value:
-        text = strip_list_marker(item)[:max_length]
+        text = strip_list_marker(item)
+        text = re.sub(r"(?<=\d)[\u2013\u2014\ufffd](?=\d)", "-", text)
+        text = text[:max_length]
         if text:
             result.append(text)
         if len(result) >= max_items:
