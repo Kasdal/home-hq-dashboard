@@ -8,6 +8,8 @@ no framework server.
 - **Host:** a small nginx container and a tiny shopping API on the home NAS.
 - **Build:** GitHub Actions on each push to `main`.
 
+<img width="2575" height="1159" alt="Image" src="https://github.com/user-attachments/assets/39b48bf4-91d2-48a9-8b77-4820a4995667" />
+
 ## Pages
 
 | Page | Contents |
