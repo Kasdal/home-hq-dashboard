@@ -569,52 +569,58 @@ hand. Both are read every couple of minutes.
 
 ## Backup
 
-The private data goes off-site every night at 03:30. restic encrypts it before
-it leaves the NAS.
+The dashboard data goes off-site every night at 03:30. The copy is plain files
+in Google Drive, so any file opens straight from the Drive web page.
 
-- restic writes to Google Drive through rclone. Both are single binaries in
-  `~/.local/bin`. They need no root.
-- The repository password is in `~/.config/homehq/restic-password`, mode 600.
-  Keep a copy outside the NAS. Without it the backup cannot be opened.
-- `backup.sh` saves `~/homehq/data`, `~/.config/homehq` and the live scripts.
-  The LLM model and the release folders are left out, because they rebuild.
-- Retention is 7 daily, 4 weekly and 12 monthly snapshots.
-- Each run reads back 10% of the data packs and reports errors.
+- `backup.sh` copies `~/homehq/data` and the live scripts with rclone. rclone
+  is a single binary in `~/.local/bin`. It needs no root.
+- The Nest credentials are not copied. They stay in `~/.config/homehq` on the
+  NAS.
+- The remote is `gdrive:homehq-backup-plain`, scope `drive.file`. rclone sees
+  only the files it creates.
+- Layout: `daily/YYYY-MM-DD`, `weekly/YYYY-Www`, `monthly/YYYY-MM`.
+- Retention is 7 daily, 4 weekly and 12 monthly copies.
+- The weekly copy runs on Sunday. The monthly copy runs on the first day of the
+  month. Both are server-side copies, so they cost no upload.
+- The LLM model and the release folders are left out, because they rebuild.
 - The log is `~/homehq/backup.log`. It rotates at 1 MB.
 
 ### First setup
 
 1. Run `rclone authorize "drive"` on a PC with a browser.
 2. Put the token in `~/.config/rclone/rclone.conf` on the NAS, mode 600.
-3. Write the repository password to `~/.config/homehq/restic-password`.
-4. Run `~/homehq/backup.sh` once.
-
-The remote is `rclone:gdrive:homehq-backup` with the `drive.file` scope. rclone
-sees only the files it creates.
+3. Run `~/homehq/backup.sh` once.
 
 ### Check and restore
 
 ```bash
-export RESTIC_REPOSITORY=rclone:gdrive:homehq-backup
-export RESTIC_PASSWORD_FILE=~/.config/homehq/restic-password
-~/.local/bin/restic snapshots
-~/.local/bin/restic check
+~/.local/bin/rclone lsd gdrive:homehq-backup-plain
+~/.local/bin/rclone lsf -R gdrive:homehq-backup-plain/daily/2026-11-08
+tail -20 ~/homehq/backup.log
 ```
 
-Restore a snapshot to a temporary folder:
+Copy one file back and compare it:
 
 ```bash
 mkdir -p /tmp/restore
-~/.local/bin/restic restore latest --target /tmp/restore
+~/.local/bin/rclone copy \
+  gdrive:homehq-backup-plain/daily/2026-11-08/data/shopping.json /tmp/restore
+diff /tmp/restore/shopping.json ~/homehq/data/shopping.json
 ```
+
+Or open the folder in the Drive web page and download the files by hand.
 
 ### Limits
 
+- The copy is not encrypted. Google and anyone with the account can read it.
+  Keep the account password strong and use two-step verification.
 - The rclone build uses the shared rclone client ID. Google retires that ID
   during 2026. Make a personal client ID before it stops. See
   https://rclone.org/drive/#making-your-own-client-id
-- The backup is a second copy, not a mirror. A lost password or a deleted
-  Google account loses the data.
+- The backup is a second copy, not a mirror. A deleted Google account loses the
+  data.
+- The old encrypted restic repository is still at `gdrive:homehq-backup`. It is
+  not updated. Delete it when the plain copy has run for a while.
 
 ## Rollback
 

@@ -15,9 +15,10 @@ Open work for the Home HQ dashboard. Keep secrets and private data out of this f
 
 ## Data safety
 
-- [x] **Off-site backup.** restic sends an encrypted snapshot to Google Drive through rclone at 03:30 daily. Covers `data`, the Nest credentials and the live scripts. Retention is 7 daily, 4 weekly and 12 monthly. Restore tested on 2026-11-08. See `deploy/README.md`.
+- [x] **Off-site backup.** rclone copies `data` and the live scripts to Google Drive at 03:30 daily. The copy is plain files, so Drive shows them normally. Retention is 7 daily, 4 weekly and 12 monthly. The Nest credentials stay off the copy. Restore tested on 2026-11-08. See `deploy/README.md`.
 - [ ] **Personal rclone client ID.** The installed rclone build uses the shared client ID. Google retires that ID during 2026. Create a client ID in the Google Cloud console, then run `rclone config reconnect gdrive:`.
-- [ ] **Backup age on Settings.** Show the last snapshot time so a silent failure is visible on the frame.
+- [ ] **Backup age on Settings.** Show the last copy time so a silent failure is visible on the frame.
+- [ ] **Delete the old encrypted repository.** `gdrive:homehq-backup` holds one restic snapshot from 2026-11-08. Remove it after the plain copy has run for a while.
 
 ## Fixes and checks
 

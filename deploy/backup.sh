@@ -1,21 +1,21 @@
 #!/bin/bash
-# Encrypted off-site backup of the private dashboard data.
+# Plain off-site copy of the dashboard data.
 #
-# restic writes to Google Drive through rclone. Both live in ~/.local/bin, so
-# this needs no sudo and no package install.
+# rclone copies readable files to Google Drive. Nothing is encrypted, so any
+# file opens straight from the Drive web page.
 #
-# The repository password is in ~/.config/homehq/restic-password. Keep a copy
-# outside the NAS. Without it the backup cannot be opened.
+# The Nest credentials and the restic password are NOT copied. They stay in
+# ~/.config/homehq on the NAS.
 set -euo pipefail
 
 export PATH="${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin"
-export RESTIC_REPOSITORY="rclone:gdrive:homehq-backup"
-export RESTIC_PASSWORD_FILE="${HOME}/.config/homehq/restic-password"
-export RESTIC_CACHE_DIR="${HOME}/.cache/restic"
+RCLONE="${HOME}/.local/bin/rclone"
+DEST="gdrive:homehq-backup-plain"
 
 BASE="${HOME}/homehq"
 LOG="${BASE}/backup.log"
 LOCK="${BASE}/.backup.lock"
+STAMP="$(date +%F)"
 
 # Keep the log small. One old copy is enough.
 if [ -f "${LOG}" ] && [ "$(stat -c %s "${LOG}")" -gt 1048576 ]; then
@@ -31,32 +31,40 @@ if ! flock -n 9; then
     exit 0
 fi
 
-if [ ! -f "${RESTIC_PASSWORD_FILE}" ]; then
-    say "error: ${RESTIC_PASSWORD_FILE} is missing"
-    exit 1
+say "start ${STAMP}"
+
+# Data files, uploads and the album cache. Lock files are skipped.
+"${RCLONE}" copy "${BASE}/data" "${DEST}/daily/${STAMP}/data" \
+    --exclude "*.lock" \
+    --exclude "*.tmp" >> "${LOG}" 2>&1
+
+# The live scripts. The rest of the project is in git.
+"${RCLONE}" copy "${BASE}" "${DEST}/daily/${STAMP}/scripts" \
+    --max-depth 1 \
+    --include "*.py" \
+    --include "*.sh" \
+    --include "nginx.conf" \
+    --include "Dockerfile.api" >> "${LOG}" 2>&1
+
+# Weekly and monthly keep points. A server-side copy, so no upload.
+if [ "$(date +%u)" = "7" ]; then
+    "${RCLONE}" copy "${DEST}/daily/${STAMP}" "${DEST}/weekly/$(date +%G-W%V)" >> "${LOG}" 2>&1
+fi
+if [ "$(date +%d)" = "01" ]; then
+    "${RCLONE}" copy "${DEST}/daily/${STAMP}" "${DEST}/monthly/$(date +%Y-%m)" >> "${LOG}" 2>&1
 fi
 
-say "start"
+# Keep the newest N folders in one tier.
+prune() {
+    local tier="$1" keep="$2" name
+    "${RCLONE}" lsf --dirs-only "${tier}" 2>/dev/null | sort | head -n "-${keep}" | while read -r name; do
+        [ -n "${name}" ] || continue
+        "${RCLONE}" purge --drive-use-trash=false "${tier}/${name}" >> "${LOG}" 2>&1
+    done || true
+}
 
-# The unique data: shopping list, recipes, uploaded photos, the live scripts
-# and the Nest credentials. The LLM model and the releases rebuild themselves.
-restic backup \
-    --tag homehq \
-    --exclude ".nest.lock" \
-    --exclude ".photos.lock" \
-    --exclude "restic-password" \
-    --exclude "*.tmp" \
-    "${BASE}/data" \
-    "${HOME}/.config/homehq" \
-    "${BASE}"/*.py \
-    "${BASE}"/*.sh \
-    "${BASE}/nginx.conf" \
-    "${BASE}/Dockerfile.api" >> "${LOG}" 2>&1
+prune "${DEST}/daily" 7
+prune "${DEST}/weekly" 4
+prune "${DEST}/monthly" 12
 
-# 7 daily, 4 weekly and 12 monthly snapshots.
-restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> "${LOG}" 2>&1
-
-# Read back a sample of the packs so damage shows up early.
-restic check --read-data-subset=10% >> "${LOG}" 2>&1
-
-say "done"
+say "done ${STAMP}"
