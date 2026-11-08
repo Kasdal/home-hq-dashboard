@@ -567,6 +567,55 @@ a poll fails.
 These files have no generator. Write them from another system, or edit them by
 hand. Both are read every couple of minutes.
 
+## Backup
+
+The private data goes off-site every night at 03:30. restic encrypts it before
+it leaves the NAS.
+
+- restic writes to Google Drive through rclone. Both are single binaries in
+  `~/.local/bin`. They need no root.
+- The repository password is in `~/.config/homehq/restic-password`, mode 600.
+  Keep a copy outside the NAS. Without it the backup cannot be opened.
+- `backup.sh` saves `~/homehq/data`, `~/.config/homehq` and the live scripts.
+  The LLM model and the release folders are left out, because they rebuild.
+- Retention is 7 daily, 4 weekly and 12 monthly snapshots.
+- Each run reads back 10% of the data packs and reports errors.
+- The log is `~/homehq/backup.log`. It rotates at 1 MB.
+
+### First setup
+
+1. Run `rclone authorize "drive"` on a PC with a browser.
+2. Put the token in `~/.config/rclone/rclone.conf` on the NAS, mode 600.
+3. Write the repository password to `~/.config/homehq/restic-password`.
+4. Run `~/homehq/backup.sh` once.
+
+The remote is `rclone:gdrive:homehq-backup` with the `drive.file` scope. rclone
+sees only the files it creates.
+
+### Check and restore
+
+```bash
+export RESTIC_REPOSITORY=rclone:gdrive:homehq-backup
+export RESTIC_PASSWORD_FILE=~/.config/homehq/restic-password
+~/.local/bin/restic snapshots
+~/.local/bin/restic check
+```
+
+Restore a snapshot to a temporary folder:
+
+```bash
+mkdir -p /tmp/restore
+~/.local/bin/restic restore latest --target /tmp/restore
+```
+
+### Limits
+
+- The rclone build uses the shared rclone client ID. Google retires that ID
+  during 2026. Make a personal client ID before it stops. See
+  https://rclone.org/drive/#making-your-own-client-id
+- The backup is a second copy, not a mirror. A lost password or a deleted
+  Google account loses the data.
+
 ## Rollback
 
 ```bash
@@ -580,7 +629,7 @@ mv -Tf ~/homehq/current.new ~/homehq/current
 ```bash
 docker stop homehq-web homehq-api homehq-llm
 docker rm homehq-web homehq-api homehq-llm
-crontab -e   # remove the pull.sh and photos.py lines
+crontab -e   # remove the pull.sh, photos.py, nest.py and backup.sh lines
 ```
 
 ## Network access

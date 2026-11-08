@@ -13,6 +13,12 @@ Open work for the Home HQ dashboard. Keep secrets and private data out of this f
 - [x] **Photo uploader.** Drag-and-drop page at `/upload/`. Saves JPEG, PNG and WebP files to `data/photos` through `POST /api/photos`. Uploads join the slideshow within about 10 minutes.
 - [ ] **Shopping merge.** Replace last-write-wins with a merge on conflict. Keep the current polling pause.
 
+## Data safety
+
+- [x] **Off-site backup.** restic sends an encrypted snapshot to Google Drive through rclone at 03:30 daily. Covers `data`, the Nest credentials and the live scripts. Retention is 7 daily, 4 weekly and 12 monthly. Restore tested on 2026-11-08. See `deploy/README.md`.
+- [ ] **Personal rclone client ID.** The installed rclone build uses the shared client ID. Google retires that ID during 2026. Create a client ID in the Google Cloud console, then run `rclone config reconnect gdrive:`.
+- [ ] **Backup age on Settings.** Show the last snapshot time so a silent failure is visible on the frame.
+
 ## Fixes and checks
 
 - [ ] **Power-cycle boot test.** Turn the frame off at the wall. Confirm the dashboard opens alone.

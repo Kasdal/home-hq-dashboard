@@ -24,6 +24,7 @@ install -m 755 "${HERE}/photos.py" "${BASE}/photos.py"
 install -m 755 "${HERE}/google_album.py" "${BASE}/google_album.py"
 install -m 755 "${HERE}/nest.py" "${BASE}/nest.py"
 install -m 755 "${HERE}/api.py" "${BASE}/api.py"
+install -m 755 "${HERE}/backup.sh" "${BASE}/backup.sh"
 install -m 644 "${HERE}/Dockerfile.api" "${BASE}/Dockerfile.api"
 
 # Remove the retired calendar job and script.
@@ -151,6 +152,14 @@ add_cron() {
         echo "Cron entry added: ${needle}"
     fi
 }
+
+# The backup needs the rclone login and the restic password first. See the
+# Backup section of deploy/README.md.
+if [ -f "${HOME}/.config/rclone/rclone.conf" ] && [ -f "${HOME}/.config/homehq/restic-password" ]; then
+    add_cron "30 3 * * * ${BASE}/backup.sh >> ${BASE}/backup.log 2>&1" "${BASE}/backup.sh"
+else
+    echo "Backup not scheduled: set up rclone and the restic password first."
+fi
 
 add_cron "*/5 * * * * ${BASE}/pull.sh >> ${BASE}/pull.log 2>&1" "${BASE}/pull.sh"
 add_cron "*/10 * * * * python3 ${BASE}/photos.py >> ${BASE}/photos.log 2>&1" "${BASE}/photos.py"
