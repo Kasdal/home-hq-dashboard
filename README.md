@@ -82,9 +82,10 @@ characters. The API image needs about 100 MB extra for the tools.
 
 After the text is ready, the same local LLM structures uploaded recipes into
 title, ingredients, steps and notes. The cap for the model input is 4,000
-characters. The original file and the full OCR text stay available. A failed
-structure keeps the raw text and shows a retry button. The setting
-`llm.autoStructure` turns the background step off.
+characters. The original file and the full OCR text stay available. The API
+drops AI items that do not appear in the source text, so invented steps are
+rejected. A failed structure keeps the raw text and shows a retry button. The
+setting `llm.autoStructure` turns the background step off.
 
 All recipe types use the same single-column view: image or photo, title, meta,
 tags, Ingredients, Preparation and Notes. A PDF has an original-file panel on a

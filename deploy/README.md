@@ -381,6 +381,9 @@ When `llm.autoStructure` is true, the API structures uploaded recipes too:
 - A failed structure keeps the raw text and shows "Retry structure".
 - `structureStatus` is `pending`, `ready`, `failed` or `none`.
 - The background worker runs one parse at a time. Manual parses have priority.
+- The API drops AI items that do not share enough words with the source text.
+  This stops invented steps. The view shows "AI structure. Check the original
+  text." until the user edits the recipe.
 
 The recipe view uses one layout for every type:
 
