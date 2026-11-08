@@ -129,7 +129,7 @@ add_cron "*/10 * * * * python3 ${BASE}/photos.py >> ${BASE}/photos.log 2>&1" "${
 add_cron "*/5 * * * * python3 ${BASE}/nest.py >> ${BASE}/nest.log 2>&1" "${BASE}/nest.py"
 
 python3 "${BASE}/photos.py" || true
-if [ -f "${BASE}/data/nest-credentials.json" ]; then
+if [ -f "${HOME}/.config/homehq/nest-credentials.json" ]; then
     python3 "${BASE}/nest.py" || true
 fi
 

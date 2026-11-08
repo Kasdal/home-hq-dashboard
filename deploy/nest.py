@@ -25,7 +25,13 @@ from email.utils import parsedate_to_datetime
 
 BASE = os.environ.get("HOMEHQ_DIR") or os.path.join(os.path.expanduser("~"), "homehq")
 DATA_DIR = os.environ.get("DATA_DIR") or os.path.join(BASE, "data")
-CRED_PATH = os.path.join(DATA_DIR, "nest-credentials.json")
+CONFIG_DIR = os.environ.get("HOMEHQ_CONFIG") or os.path.join(
+    os.path.expanduser("~"), ".config", "homehq"
+)
+# Not under data/: nginx serves data/ on the LAN. The token must stay private.
+CRED_PATH = os.environ.get("NEST_CREDENTIALS") or os.path.join(
+    CONFIG_DIR, "nest-credentials.json"
+)
 OUT_PATH = os.path.join(DATA_DIR, "nest.json")
 LOCK_PATH = os.path.join(DATA_DIR, ".nest.lock")
 
