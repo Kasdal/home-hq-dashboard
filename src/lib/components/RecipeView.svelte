@@ -350,9 +350,14 @@
           </div>
         {/if}
 
-        {#if structureNote(recipe)}
+        {#if structureNote(recipe) || (recipe.type !== 'manual' && recipe.structureSource === 'llm' && recipe.structureStatus === 'ready')}
           <div class="cook-structure-row">
-            <span class="cook-structure-note">{structureNote(recipe)}</span>
+            {#if structureNote(recipe)}
+              <span class="cook-structure-note">{structureNote(recipe)}</span>
+            {/if}
+            {#if recipe.type !== 'manual' && recipe.structureSource === 'llm' && recipe.structureStatus === 'ready'}
+              <span class="cook-structure-note">AI structure. Check the original text.</span>
+            {/if}
             {#if recipe.type !== 'manual' && (recipe.structureStatus === 'failed' || recipe.structureStatus === 'none') && recipe.textStatus === 'ready'}
               <button class="cook-secondary" type="button" onclick={retry} disabled={retrying}>
                 {retrying
