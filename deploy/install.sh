@@ -130,6 +130,7 @@ docker run -d \
     -e DATA_DIR=/data \
     -e LLM_BACKEND="${LLM_BACKEND}" \
     -e OPENROUTER_MODEL="${OPENROUTER_MODEL}" \
+    -e OPENROUTER_FALLBACKS="${OPENROUTER_FALLBACKS-google/gemma-4-26b-a4b-it}" \
     -e OPENROUTER_KEY_FILE=/secrets/openrouter-key \
     -v "${BASE}/api.py:/api/api.py:ro" \
     -v "${BASE}/data:/data" \

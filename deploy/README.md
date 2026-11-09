@@ -405,6 +405,12 @@ bash ~/homehq-setup/deploy/install.sh
 Other settings:
 
 - `OPENROUTER_MODEL` defaults to `google/gemma-4-26b-a4b-it:free`.
+- `OPENROUTER_FALLBACKS` defaults to `google/gemma-4-26b-a4b-it`, the paid twin
+  of the same model. The free model runs on one upstream pool, which is often
+  rate-limited. The API sends both ids, so OpenRouter can use the paid one when
+  the free pool is busy. Set it to an empty string to use the free model only.
+- On HTTP 429 or 5xx the API retries twice with `OPENROUTER_RETRY_DELAY`
+  seconds between tries. The default is 5 seconds.
 - The API asks for a JSON schema first, then a JSON object, then plain text
   with the JSON instruction in the prompt. Some free models accept only the
   last form.

@@ -77,6 +77,17 @@ OPENROUTER_MODEL = os.environ.get(
 OPENROUTER_KEY_FILE = os.environ.get(
     "OPENROUTER_KEY_FILE", "/secrets/openrouter-key"
 )
+# The free model runs on one upstream provider. When that pool is busy, the
+# API retries the paid twin of the same model. Set OPENROUTER_FALLBACKS="" to
+# stop that, or list other model ids.
+OPENROUTER_FALLBACKS = [
+    item.strip()
+    for item in os.environ.get(
+        "OPENROUTER_FALLBACKS", "google/gemma-4-26b-a4b-it"
+    ).split(",")
+    if item.strip()
+]
+OPENROUTER_RETRY_DELAY = int(os.environ.get("OPENROUTER_RETRY_DELAY", "5"))
 MAX_MANUAL_TEXT = 4000
 
 LOCK = threading.Lock()
@@ -935,7 +946,6 @@ def ollama_generate(system, user, schema):
 def openrouter_generate(system, user, schema):
     key = openrouter_key()
     body = {
-        "model": OPENROUTER_MODEL,
         "stream": False,
         "temperature": 0,
         "max_tokens": 4096,
@@ -944,6 +954,10 @@ def openrouter_generate(system, user, schema):
             {"role": "user", "content": user},
         ],
     }
+    if OPENROUTER_FALLBACKS:
+        body["models"] = [OPENROUTER_MODEL] + OPENROUTER_FALLBACKS
+    else:
+        body["model"] = OPENROUTER_MODEL
     headers = {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + key,
@@ -961,27 +975,39 @@ def openrouter_generate(system, user, schema):
         attempt = dict(body)
         if json_format:
             attempt["response_format"] = json_format
-        request = urllib.request.Request(
-            OPENROUTER_URL,
-            data=json.dumps(attempt).encode("utf-8"),
-            headers=headers,
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=LLM_TIMEOUT) as response:
-                result = json.load(response)
-        except urllib.error.HTTPError as error:
-            try:
-                detail = error.read().decode("utf-8", "replace")[:300]
-            except Exception:
-                detail = ""
-            print(
-                "recipes: OpenRouter format %s failed with HTTP %d: %s"
-                % (index + 1, error.code, detail),
-                flush=True,
+        result = None
+        for try_number in range(3):
+            request = urllib.request.Request(
+                OPENROUTER_URL,
+                data=json.dumps(attempt).encode("utf-8"),
+                headers=headers,
             )
-            if error.code in (400, 404, 422) and index < len(formats) - 1:
-                continue
-            raise
+            try:
+                with urllib.request.urlopen(
+                    request, timeout=LLM_TIMEOUT
+                ) as response:
+                    result = json.load(response)
+                break
+            except urllib.error.HTTPError as error:
+                try:
+                    detail = error.read().decode("utf-8", "replace")[:300]
+                except Exception:
+                    detail = ""
+                print(
+                    "recipes: OpenRouter format %s try %s failed with HTTP %d: %s"
+                    % (index + 1, try_number + 1, error.code, detail),
+                    flush=True,
+                )
+                if error.code in (429, 500, 502, 503, 529) and try_number < 2:
+                    time.sleep(OPENROUTER_RETRY_DELAY)
+                    continue
+                if error.code in (400, 404, 422) and index < len(formats) - 1:
+                    break
+                raise
+        else:
+            raise LLMError("OpenRouter did not answer after retries")
+        if result is None:
+            continue
         choices = result.get("choices") or []
         if not choices:
             raise LLMError("OpenRouter returned no choices")
