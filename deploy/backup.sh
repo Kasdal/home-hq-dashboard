@@ -4,8 +4,8 @@
 # rclone copies readable files to Google Drive. Nothing is encrypted, so any
 # file opens straight from the Drive web page.
 #
-# The Nest credentials and the restic password are NOT copied. They stay in
-# ~/.config/homehq on the NAS.
+# The Nest credentials, the restic password and the OpenRouter key are NOT
+# copied. They stay in ~/.config/homehq on the NAS.
 set -euo pipefail
 
 export PATH="${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin"
