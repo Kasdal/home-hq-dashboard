@@ -14,26 +14,19 @@ REPO_URL="https://github.com/Kasdal/home-hq-dashboard.git"
 SECRETS_DIR="${HOME}/.config/homehq"
 OPENROUTER_KEY_FILE="${SECRETS_DIR}/openrouter-key"
 
-# The recipe parser runs on the NAS by default. If an OpenRouter key file
-# exists, the API uses OpenRouter instead. Set LLM_BACKEND=ollama to force the
-# local model, or LLM_BACKEND=openrouter to force the cloud model.
-LLM_BACKEND="${LLM_BACKEND:-}"
-if [ -z "${LLM_BACKEND}" ]; then
-    if [ -s "${OPENROUTER_KEY_FILE}" ]; then
-        LLM_BACKEND="openrouter"
-    else
-        LLM_BACKEND="ollama"
-    fi
+# The recipe parser uses OpenRouter. Set LLM_BACKEND=ollama only when another
+# Ollama server is reachable at LLM_URL.
+LLM_BACKEND="${LLM_BACKEND:-openrouter}"
+if [ "${LLM_BACKEND}" = "openrouter" ] && [ ! -s "${OPENROUTER_KEY_FILE}" ]; then
+    echo "WARNING: no key at ${OPENROUTER_KEY_FILE}. The parser will return 502."
 fi
 OPENROUTER_MODEL="${OPENROUTER_MODEL:-google/gemma-4-26b-a4b-it:free}"
-# LLM_LOCAL=0 stops the local Ollama container and skips the model pull.
-LLM_LOCAL="${LLM_LOCAL:-1}"
 
 echo "Base directory: ${BASE}"
 
 mkdir -p "${BASE}/releases/bootstrap" "${BASE}/data/photos" "${BASE}/data/photo-cache"
 mkdir -p "${BASE}/data/recipes/files" "${BASE}/data/recipes/thumbs" "${BASE}/.build"
-mkdir -p "${BASE}/llm" "${SECRETS_DIR}"
+mkdir -p "${SECRETS_DIR}"
 chmod 700 "${SECRETS_DIR}" 2>/dev/null || true
 
 install -m 644 "${HERE}/nginx.conf" "${BASE}/nginx.conf"
@@ -145,28 +138,11 @@ if [ "${LLM_BACKEND}" = "openrouter" ]; then
     fi
 fi
 
-if [ "${LLM_LOCAL}" = "0" ]; then
+# The retired local model container is removed on purpose. The recipe parser
+# runs on OpenRouter. The model volume ~/homehq/llm is not deleted here.
+if docker inspect "${LLM}" >/dev/null 2>&1; then
     docker rm -f "${LLM}" >/dev/null 2>&1 || true
-    echo "Local model is off (LLM_LOCAL=0). Model volume kept at ${BASE}/llm."
-else
-    # Local LLM for manual recipe parsing. No published port. The model unloads
-    # after two idle minutes, so RAM is free between parses.
-    docker rm -f "${LLM}" >/dev/null 2>&1 || true
-    docker run -d \
-        --name "${LLM}" \
-        --restart unless-stopped \
-        --network "${NETWORK}" \
-        -v "${BASE}/llm:/root/.ollama" \
-        ollama/ollama
-
-    for _ in $(seq 1 30); do
-        if docker exec "${LLM}" ollama list >/dev/null 2>&1; then
-            break
-        fi
-        sleep 1
-    done
-    echo "Pulling the recipe model (about 1 GB, first run only)..."
-    docker exec "${LLM}" ollama pull qwen2.5:1.5b
+    echo "Removed the retired ${LLM} container."
 fi
 
 # Start or replace the web container.
@@ -215,10 +191,8 @@ fi
 sleep 2
 docker ps --filter "name=${CONTAINER}"
 docker ps --filter "name=${API}"
-if [ "${LLM_LOCAL}" = "0" ]; then
-    echo "Local model container is not running."
-else
-    docker ps --filter "name=${LLM}"
+if docker inspect "${LLM}" >/dev/null 2>&1; then
+    echo "${LLM} is still present. Remove it with docker rm -f ${LLM}."
 fi
 curl -sS -o /dev/null -w "HTTP %{http_code} on port ${PORT}\n" "http://127.0.0.1:${PORT}/"
 curl -sS -o /dev/null -w "API %{http_code}\n" "http://127.0.0.1:${PORT}/api/health"

@@ -64,7 +64,7 @@ OCR_PAGES = 10
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 RECIPE_TEXT_EXTS = {".txt", ".md", ".markdown"}
 
-LLM_BACKEND = os.environ.get("LLM_BACKEND", "ollama").strip().lower()
+LLM_BACKEND = os.environ.get("LLM_BACKEND", "openrouter").strip().lower()
 LLM_URL = os.environ.get("LLM_URL", "http://homehq-llm:11434")
 LLM_MODEL = os.environ.get("LLM_MODEL", "qwen2.5:1.5b")
 LLM_TIMEOUT = int(os.environ.get("LLM_TIMEOUT", "180"))
