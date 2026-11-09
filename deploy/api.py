@@ -1011,6 +1011,11 @@ def openrouter_generate(system, user, schema):
         choices = result.get("choices") or []
         if not choices:
             raise LLMError("OpenRouter returned no choices")
+        print(
+            "recipes: OpenRouter answered with %s"
+            % (result.get("model") or "unknown"),
+            flush=True,
+        )
         content = (choices[0].get("message") or {}).get("content")
         if isinstance(content, list):
             content = "".join(
