@@ -1,6 +1,10 @@
 # Private handoff with LAN details. Do not publish.
 HANDOFF.md
 
+# API keys. These live on the NAS only.
+*openrouter-key*
+secrets/
+
 # Node and build output
 node_modules/
 dist/

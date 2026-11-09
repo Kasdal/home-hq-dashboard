@@ -11,12 +11,30 @@ API="homehq-api"
 LLM="homehq-llm"
 NETWORK="homehq"
 REPO_URL="https://github.com/Kasdal/home-hq-dashboard.git"
+SECRETS_DIR="${HOME}/.config/homehq"
+OPENROUTER_KEY_FILE="${SECRETS_DIR}/openrouter-key"
+
+# The recipe parser runs on the NAS by default. If an OpenRouter key file
+# exists, the API uses OpenRouter instead. Set LLM_BACKEND=ollama to force the
+# local model, or LLM_BACKEND=openrouter to force the cloud model.
+LLM_BACKEND="${LLM_BACKEND:-}"
+if [ -z "${LLM_BACKEND}" ]; then
+    if [ -s "${OPENROUTER_KEY_FILE}" ]; then
+        LLM_BACKEND="openrouter"
+    else
+        LLM_BACKEND="ollama"
+    fi
+fi
+OPENROUTER_MODEL="${OPENROUTER_MODEL:-google/gemma-4-26b-a4b-it:free}"
+# LLM_LOCAL=0 stops the local Ollama container and skips the model pull.
+LLM_LOCAL="${LLM_LOCAL:-1}"
 
 echo "Base directory: ${BASE}"
 
 mkdir -p "${BASE}/releases/bootstrap" "${BASE}/data/photos" "${BASE}/data/photo-cache"
 mkdir -p "${BASE}/data/recipes/files" "${BASE}/data/recipes/thumbs" "${BASE}/.build"
-mkdir -p "${BASE}/llm"
+mkdir -p "${BASE}/llm" "${SECRETS_DIR}"
+chmod 700 "${SECRETS_DIR}" 2>/dev/null || true
 
 install -m 644 "${HERE}/nginx.conf" "${BASE}/nginx.conf"
 install -m 755 "${HERE}/pull.sh" "${BASE}/pull.sh"
@@ -100,7 +118,9 @@ docker network inspect "${NETWORK}" >/dev/null 2>&1 || docker network create "${
 echo "Building the API image (Tesseract, Poppler, Pillow)..."
 docker build -t homehq-api:local -f "${BASE}/Dockerfile.api" "${BASE}/.build"
 
-# Data API. Runs as the owner of the data folder and has no open port.
+# Data API. Runs as the owner of the data folder and has no open port. The
+# secrets folder is mounted read-only for the OpenRouter key.
+echo "Recipe parser backend: ${LLM_BACKEND}"
 docker rm -f "${API}" >/dev/null 2>&1 || true
 docker run -d \
     --name "${API}" \
@@ -108,28 +128,45 @@ docker run -d \
     --network "${NETWORK}" \
     --user "$(id -u):$(id -g)" \
     -e DATA_DIR=/data \
+    -e LLM_BACKEND="${LLM_BACKEND}" \
+    -e OPENROUTER_MODEL="${OPENROUTER_MODEL}" \
+    -e OPENROUTER_KEY_FILE=/secrets/openrouter-key \
     -v "${BASE}/api.py:/api/api.py:ro" \
     -v "${BASE}/data:/data" \
+    -v "${SECRETS_DIR}:/secrets:ro" \
     homehq-api:local python3 /api/api.py
 
-# Local LLM for manual recipe parsing. No published port. The model unloads
-# after two idle minutes, so RAM is free between parses.
-docker rm -f "${LLM}" >/dev/null 2>&1 || true
-docker run -d \
-    --name "${LLM}" \
-    --restart unless-stopped \
-    --network "${NETWORK}" \
-    -v "${BASE}/llm:/root/.ollama" \
-    ollama/ollama
-
-for _ in $(seq 1 30); do
-    if docker exec "${LLM}" ollama list >/dev/null 2>&1; then
-        break
+if [ "${LLM_BACKEND}" = "openrouter" ]; then
+    if [ -s "${OPENROUTER_KEY_FILE}" ]; then
+        chmod 600 "${OPENROUTER_KEY_FILE}" 2>/dev/null || true
+    else
+        echo "WARNING: LLM_BACKEND=openrouter but ${OPENROUTER_KEY_FILE} is missing."
     fi
-    sleep 1
-done
-echo "Pulling the recipe model (about 1 GB, first run only)..."
-docker exec "${LLM}" ollama pull qwen2.5:1.5b
+fi
+
+if [ "${LLM_LOCAL}" = "0" ]; then
+    docker rm -f "${LLM}" >/dev/null 2>&1 || true
+    echo "Local model is off (LLM_LOCAL=0). Model volume kept at ${BASE}/llm."
+else
+    # Local LLM for manual recipe parsing. No published port. The model unloads
+    # after two idle minutes, so RAM is free between parses.
+    docker rm -f "${LLM}" >/dev/null 2>&1 || true
+    docker run -d \
+        --name "${LLM}" \
+        --restart unless-stopped \
+        --network "${NETWORK}" \
+        -v "${BASE}/llm:/root/.ollama" \
+        ollama/ollama
+
+    for _ in $(seq 1 30); do
+        if docker exec "${LLM}" ollama list >/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+    echo "Pulling the recipe model (about 1 GB, first run only)..."
+    docker exec "${LLM}" ollama pull qwen2.5:1.5b
+fi
 
 # Start or replace the web container.
 docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
@@ -177,6 +214,10 @@ fi
 sleep 2
 docker ps --filter "name=${CONTAINER}"
 docker ps --filter "name=${API}"
-docker ps --filter "name=${LLM}"
+if [ "${LLM_LOCAL}" = "0" ]; then
+    echo "Local model container is not running."
+else
+    docker ps --filter "name=${LLM}"
+fi
 curl -sS -o /dev/null -w "HTTP %{http_code} on port ${PORT}\n" "http://127.0.0.1:${PORT}/"
 curl -sS -o /dev/null -w "API %{http_code}\n" "http://127.0.0.1:${PORT}/api/health"

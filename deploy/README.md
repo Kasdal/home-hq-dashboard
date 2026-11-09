@@ -31,7 +31,9 @@ Two containers run from a private Docker network named `homehq`:
   The image adds Tesseract, Poppler, Pillow and Liberation fonts for recipe
   text extraction and PDF thumbnails.
 - `homehq-llm`: `ollama/ollama`, no published port. It runs Qwen2.5 1.5B for
-  the manual recipe parser. The model unloads after two idle minutes.
+  the manual recipe parser. The model unloads after two idle minutes. This
+  container is optional: the API can use OpenRouter instead. See "Recipe
+  parser backends" below.
 
 `~/homehq/data` is mounted read-only in the web container at `/sitedata` and
 read-write in the API container at `/data`. A deploy swaps the `current`
@@ -346,8 +348,8 @@ The Cooking page has a "Paste recipe" button. It opens a form with a large text
 area, an optional photo and tags. Paste any recipe text up to 4,000 characters.
 The text can come from any web page or note.
 
-The button `Dodaj uz pomoc AI modela` sends the text to the local LLM. The API
-asks for a JSON object with `title`, `ingredients`, `steps` and `notes`. The
+The button `Dodaj uz pomoc AI modela` sends the text to the recipe parser. The
+API asks for a JSON object with `title`, `ingredients`, `steps` and `notes`. The
 model runs with a JSON schema, temperature 0, 3 threads and a 4,096 token
 context. A short recipe takes about 10-20 seconds. A long web page can take
 about a minute. The prompt keeps the full ingredient quantity and unit,
@@ -361,7 +363,8 @@ A manual entry has `type: "manual"`, `ingredients` and `steps` arrays, an
 optional photo, and a formatted `text` for search. The recipe view uses a
 single column: photo, title, meta, tags, Ingredients, Preparation, Notes.
 
-The model is Qwen2.5 1.5B Q4. The `homehq-llm` container has no published port.
+The model is Qwen2.5 1.5B Q4 when the backend is `ollama`. The `homehq-llm`
+container has no published port.
 The model loads on the first parse, and unloads after two idle minutes. Idle RAM
 for the container is about 100-200 MB. A parse uses about 1.5-2 GB RAM and all
 four CPU cores for about 20 seconds. Use `LLM_THREADS=3` in the API to leave one
@@ -376,6 +379,43 @@ and the API returns 503.
 The parse endpoint has a 180 second timeout in nginx. A 4,000 character paste
 takes longer than the normal 15 second API timeout, so it has its own location
 block.
+
+#### Recipe parser backends
+
+The API has two backends for the recipe parser. `LLM_BACKEND` selects one.
+
+- `ollama` is the default. The API calls `POST /api/generate` on
+  `homehq-llm`. No network access is needed, and the text stays on the NAS.
+- `openrouter` calls `POST https://openrouter.ai/api/v1/chat/completions`. The
+  text goes to OpenRouter. The installer selects this backend when
+  `~/.config/homehq/openrouter-key` exists.
+
+The key is read from `OPENROUTER_KEY_FILE`, which defaults to
+`/secrets/openrouter-key` in the container. The installer mounts
+`~/.config/homehq` read-only at `/secrets`. Keep the key in mode 600 in
+`~/.config/homehq`. Do not put it in `data/`, because nginx serves that folder.
+Do not put it in git.
+
+```bash
+install -m 600 /dev/null ~/.config/homehq/openrouter-key
+# Paste the key into the file, then run the installer.
+bash ~/homehq-setup/deploy/install.sh
+```
+
+Other settings:
+
+- `OPENROUTER_MODEL` defaults to `google/gemma-4-26b-a4b-it:free`.
+- The API asks for a JSON schema first, then a JSON object, then plain text
+  with the JSON instruction in the prompt. Some free models accept only the
+  last form.
+- `LLM_LOCAL=0` stops `homehq-llm` and skips the model pull. Use it after the
+  owner confirms the cloud model works.
+
+```bash
+LLM_LOCAL=0 bash ~/homehq-setup/deploy/install.sh
+```
+
+To return to the local model, delete the key file and run the installer again.
 
 #### Automatic structure for uploaded recipes
 
@@ -433,9 +473,12 @@ Components:
   The image is 8.5 GB.
 - Model: `qwen2.5:1.5b`, Q4_K_M, 986 MB, model ID `65ec06548149`, context
   32768, Apache 2.0.
-- API defaults: `LLM_URL=http://homehq-llm:11434`,
+- API defaults: `LLM_BACKEND=ollama`, `LLM_URL=http://homehq-llm:11434`,
   `LLM_MODEL=qwen2.5:1.5b`, `LLM_TIMEOUT=180`, `LLM_THREADS=3`,
-  `MAX_MANUAL_TEXT=4000`.
+  `MAX_MANUAL_TEXT=4000`. OpenRouter defaults:
+  `OPENROUTER_MODEL=google/gemma-4-26b-a4b-it:free`,
+  `OPENROUTER_URL=https://openrouter.ai/api/v1/chat/completions`,
+  `OPENROUTER_KEY_FILE=/secrets/openrouter-key`.
 - Request: `POST /api/generate`, `stream:false`, `format` JSON schema,
   `temperature:0`, `num_ctx:4096`, `keep_alive:2m`.
 - The prompt, schema and support check are in `deploy/api.py`.
@@ -472,8 +515,9 @@ Disk: about 9.5 GB for the Ollama image and model, plus about 100 MB for the
 API image. Memory: about 1.5-2 GB during a parse. The container idles at about
 100-200 MB. Hardware tested: Intel N100, 4 cores, 7.5 GB RAM, AVX2.
 
-The `homehq-llm` container has no published port. Pasted text stays on the NAS.
-The model does not call a cloud service. The model and image are not in git.
+The `homehq-llm` container has no published port. With the `ollama` backend,
+pasted text stays on the NAS. With the `openrouter` backend, pasted text goes to
+OpenRouter. The model and image are not in git.
 
 ### Meal plan
 
