@@ -11,7 +11,7 @@ POST   /photos?kind=recipe -> upload one recipe, creates an entry in recipes.jso
 DELETE /photos    -> remove one upload, ?name=file.jpg
 GET    /recipes   -> recipe metadata and text
 POST   /recipes   -> update titles, tags, notes and manual fields
-POST   /recipes/parse  -> parse free text with the local LLM
+POST   /recipes/parse  -> parse free text with the recipe parser
 POST   /recipes/manual -> create a manual recipe
 DELETE /recipes   -> remove one recipe and its files, ?id=...
 GET    /plan      -> meal plan
@@ -20,7 +20,8 @@ POST   /plan      -> replace the meal plan
 Files are written with a temporary file and os.replace, so a reader never sees
 a half-written document. Only the standard library is used. OCR calls the
 tesseract and poppler command line tools when the container has them. The
-manual recipe parser calls the local Ollama container.
+recipe parser calls OpenRouter, or the local Ollama container when
+LLM_BACKEND=ollama.
 """
 
 import glob
