@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Home HQ - Upload photos</title>
+    <style>
+      @font-face {
+        font-family: 'Anton';
+        src: url('/fonts/anton-latin.woff2') format('woff2');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        --font-display: 'Anton', 'Arial Narrow', system-ui, sans-serif;
+        --font-sans: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        --bg: #f2eee6;
+        --card: #faf8f3;
+        --ink: #111111;
+        --ink-soft: #3f3b34;
+        --muted: #7c7568;
+        --hairline: #d9d2c3;
+        --strong-bg: #111111;
+        --strong-ink: #f7f3ea;
+        --green: #2e7d4f;
+        --red: #b3402f;
+        --amber: #c98a1e;
+        --radius: 20px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0d1218;
+          --card: #151d26;
+          --ink: #e8eef4;
+          --ink-soft: #c2ccd6;
+          --muted: #8fa0b0;
+          --hairline: #26323e;
+          --strong-bg: #ece6d8;
+          --strong-ink: #0d1218;
+          --green: #4dbf74;
+          --red: #e5534b;
+          --amber: #f5c451;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-sans);
+        font-size: 15px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      main {
+        width: min(920px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 80px;
+      }
+
+      header {
+        display: flex;
+        align-items: flex-end;
+        gap: 16px;
+        padding-bottom: 18px;
+        border-bottom: 3px solid var(--ink);
+      }
+
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        background: var(--strong-bg);
+        color: var(--strong-ink);
+        font-family: var(--font-display);
+        font-size: 18px;
+        letter-spacing: 0.04em;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 38px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        line-height: 1;
+      }
+
+      header p {
+        margin: 4px 0 0;
+        color: var(--muted);
+      }
+
+      .back {
+        margin-left: auto;
+        color: var(--ink-soft);
+        font-size: 13px;
+        text-decoration: none;
+        border-bottom: 1px solid var(--hairline);
+        padding-bottom: 2px;
+      }
+
+      .back:hover {
+        border-color: var(--ink);
+      }
+
+      .drop {
+        margin-top: 26px;
+        padding: 46px 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        background: var(--card);
+        border: 2px dashed var(--hairline);
+        border-radius: var(--radius);
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s;
+      }
+
+      .drop strong {
+        font-size: 20px;
+      }
+
+      .drop span,
+      .drop small {
+        color: var(--muted);
+      }
+
+      .drop.over {
+        border-color: var(--green);
+        background: var(--card);
+      }
+
+      .link-button {
+        appearance: none;
+        border: 0;
+        background: none;
+        padding: 0;
+        color: var(--ink);
+        font: inherit;
+        font-weight: 600;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+
+      .queue {
+        margin-top: 22px;
+      }
+
+      .queue ul,
+      .gallery {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .queue li {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--hairline);
+        font-size: 14px;
+      }
+
+      .queue .name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .state {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .state.done {
+        color: var(--green);
+      }
+
+      .state.fail {
+        color: var(--red);
+      }
+
+      .bar {
+        width: 120px;
+        height: 4px;
+        background: var(--hairline);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .bar span {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--ink);
+        transition: width 0.15s;
+      }
+
+      .saved {
+        margin-top: 40px;
+      }
+
+      .saved-head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--hairline);
+      }
+
+      h2 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 22px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .saved-head small {
+        color: var(--muted);
+      }
+
+      .saved-head .link-button {
+        margin-left: auto;
+        font-size: 13px;
+        font-weight: 400;
+        color: var(--muted);
+      }
+
+      .empty {
+        color: var(--muted);
+        padding: 18px 0;
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .gallery li {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #10151a;
+        aspect-ratio: 4 / 3;
+      }
+
+      .gallery img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .gallery .meta {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 20px 10px 8px;
+        color: #f7f3ea;
+        font-size: 11px;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .delete {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 26px;
+        height: 26px;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.55);
+        color: #f7f3ea;
+        font-size: 15px;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      .delete:hover {
+        background: var(--red);
+      }
+
+      .note {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="mark">HQ</div>
+        <div>
+          <h1>Photos</h1>
+          <p>Upload photos to the frame</p>
+        </div>
+        <a class="back" href="/#photos">Open the slideshow</a>
+      </header>
+
+      <section class="drop" id="drop" tabindex="0" role="button" aria-label="Drop photos here or choose files">
+        <strong>Drop photos here</strong>
+        <span>or <button class="link-button" id="pick" type="button">choose files</button></span>
+        <small>JPEG, PNG or WebP. Up to 20 MB each.</small>
+      </section>
+      <input id="file" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
+
+      <section class="queue" id="queue" hidden>
+        <ul id="queue-list"></ul>
+      </section>
+
+      <section class="saved">
+        <div class="saved-head">
+          <h2>On the frame</h2>
+          <small id="count"></small>
+          <button class="link-button" id="reload" type="button">Refresh</button>
+        </div>
+        <p class="empty" id="empty">No uploaded photos yet.</p>
+        <ul class="gallery" id="gallery"></ul>
+      </section>
+
+      <p class="note">
+        Uploads are stored in <code>data/photos</code> on the NAS. The frame
+        picks them up on its next slideshow refresh, within about 10 minutes.
+      </p>
+    </main>
+
+    <script>
+      const MAX_BYTES = 20 * 1024 * 1024
+      const TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+      const drop = document.getElementById('drop')
+      const input = document.getElementById('file')
+      const pick = document.getElementById('pick')
+      const queue = document.getElementById('queue')
+      const queueList = document.getElementById('queue-list')
+      const gallery = document.getElementById('gallery')
+      const empty = document.getElementById('empty')
+      const count = document.getElementById('count')
+      const reload = document.getElementById('reload')
+
+      let busy = false
+
+      function humanSize(bytes) {
+        if (bytes < 1024) return bytes + ' B'
+        if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB'
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+      }
+
+      function rowFor(file) {
+        const li = document.createElement('li')
+        const name = document.createElement('span')
+        name.className = 'name'
+        name.textContent = file.name
+        const bar = document.createElement('div')
+        bar.className = 'bar'
+        const fill = document.createElement('span')
+        bar.appendChild(fill)
+        const state = document.createElement('span')
+        state.className = 'state'
+        state.textContent = 'waiting'
+        li.append(name, bar, state)
+        queueList.appendChild(li)
+        return { li, fill, state }
+      }
+
+      function setState(row, text, kind) {
+        row.state.textContent = text
+        row.state.className = 'state' + (kind ? ' ' + kind : '')
+      }
+
+      function upload(file, row) {
+        return new Promise((resolve) => {
+          const xhr = new XMLHttpRequest()
+          xhr.open('POST', '/api/photos?name=' + encodeURIComponent(file.name))
+          xhr.responseType = 'json'
+
+          xhr.upload.onprogress = (event) => {
+            if (!event.lengthComputable) return
+            const percent = Math.round((event.loaded / event.total) * 100)
+            row.fill.style.width = percent + '%'
+            setState(row, percent + '%')
+          }
+
+          xhr.onload = () => {
+            const body = xhr.response || {}
+            if (xhr.status === 200) {
+              row.fill.style.width = '100%'
+              setState(row, body.existed ? 'already there' : 'done', 'done')
+            } else {
+              setState(row, 'failed: ' + (body.error || xhr.status), 'fail')
+            }
+            resolve()
+          }
+
+          xhr.onerror = () => {
+            setState(row, 'failed: network error', 'fail')
+            resolve()
+          }
+
+          xhr.send(file)
+        })
+      }
+
+      async function runQueue(files) {
+        if (busy) return
+        busy = true
+        queue.hidden = false
+
+        for (const file of files) {
+          const row = rowFor(file)
+          if (!TYPES.includes(file.type)) {
+            setState(row, 'skipped: not JPEG, PNG or WebP', 'fail')
+            continue
+          }
+          if (file.size > MAX_BYTES) {
+            setState(row, 'skipped: larger than 20 MB', 'fail')
+            continue
+          }
+          setState(row, 'uploading')
+          await upload(file, row)
+        }
+
+        busy = false
+        loadGallery()
+      }
+
+      function handleFiles(fileList) {
+        const files = Array.from(fileList || [])
+        if (files.length) runQueue(files)
+      }
+
+      drop.addEventListener('click', () => input.click())
+      pick.addEventListener('click', (event) => {
+        event.stopPropagation()
+        input.click()
+      })
+      input.addEventListener('change', () => {
+        handleFiles(input.files)
+        input.value = ''
+      })
+
+      drop.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          input.click()
+        }
+      })
+
+      ;['dragenter', 'dragover'].forEach((type) => {
+        drop.addEventListener(type, (event) => {
+          event.preventDefault()
+          drop.classList.add('over')
+        })
+      })
+
+      ;['dragleave', 'drop'].forEach((type) => {
+        drop.addEventListener(type, (event) => {
+          event.preventDefault()
+          drop.classList.remove('over')
+        })
+      })
+
+      drop.addEventListener('drop', (event) => {
+        handleFiles(event.dataTransfer.files)
+      })
+
+      window.addEventListener('dragover', (event) => event.preventDefault())
+      window.addEventListener('drop', (event) => event.preventDefault())
+
+      async function remove(name) {
+        if (!confirm('Remove ' + name + ' from the frame?')) return
+        try {
+          const response = await fetch('/api/photos?name=' + encodeURIComponent(name), {
+            method: 'DELETE',
+          })
+          if (!response.ok) throw new Error('delete failed')
+          loadGallery()
+        } catch {
+          alert('Could not remove the photo. Is the API running?')
+        }
+      }
+
+      async function loadGallery() {
+        try {
+          const response = await fetch('/api/photos', { cache: 'no-store' })
+          if (!response.ok) throw new Error('list failed')
+          const doc = await response.json()
+          const photos = Array.isArray(doc.photos) ? doc.photos : []
+
+          gallery.innerHTML = ''
+          empty.hidden = photos.length > 0
+          count.textContent = photos.length ? photos.length + ' uploaded' : ''
+
+          for (const photo of photos) {
+            const li = document.createElement('li')
+            const img = document.createElement('img')
+            img.src = photo.url
+            img.alt = photo.name
+            img.loading = 'lazy'
+            const meta = document.createElement('span')
+            meta.className = 'meta'
+            meta.textContent = humanSize(photo.size) + ' - ' + photo.modified.replace('T', ' ')
+            const button = document.createElement('button')
+            button.className = 'delete'
+            button.type = 'button'
+            button.title = 'Remove'
+            button.setAttribute('aria-label', 'Remove ' + photo.name)
+            button.textContent = '\u00d7'
+            button.addEventListener('click', () => remove(photo.name))
+            li.append(img, meta, button)
+            gallery.appendChild(li)
+          }
+        } catch {
+          empty.hidden = false
+          empty.textContent = 'Could not reach the photo API. Check that the NAS is online.'
+        }
+      }
+
+      reload.addEventListener('click', loadGallery)
+      loadGallery()
+    </script>
+  </body>
+</html>
